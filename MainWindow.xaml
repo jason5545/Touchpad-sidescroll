@@ -1,0 +1,369 @@
+<Window x:Class="TouchpadSideScroll.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        xmlns:local="clr-namespace:TouchpadSideScroll"
+        mc:Ignorable="d"
+        Title="Touchpad 側邊捲動"
+        Height="700"
+        Width="900"
+        MinHeight="600"
+        MinWidth="800"
+        WindowStartupLocation="CenterScreen"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        StateChanged="Window_StateChanged"
+        Closing="Window_Closing">
+
+    <Window.Resources>
+        <!-- 值轉換器：bool 轉 Brush -->
+        <local:BoolToBrushConverter x:Key="BoolToBrushConverter"
+                                    TrueBrush="{StaticResource EnabledBrush}"
+                                    FalseBrush="{StaticResource DisabledBrush}"/>
+
+        <!-- 值轉換器：Enum 轉 Bool -->
+        <local:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+
+        <!-- ToggleSwitch 標題模板 -->
+        <DataTemplate x:Key="ToggleSwitchHeaderTemplate">
+            <TextBlock Text="{Binding}" FontSize="14" FontWeight="Normal"/>
+        </DataTemplate>
+
+        <!-- 系統匣 (NotifyIcon) -->
+        <tb:TaskbarIcon x:Key="NotifyIcon"
+                        x:Name="NotifyIcon"
+                        IconSource="Resources/app.ico"
+                        ToolTipText="Touchpad 側邊捲動"
+                        TrayLeftMouseDown="NotifyIcon_TrayLeftMouseDown">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="開啟" Click="ShowWindow_Click" FontWeight="Bold"/>
+                    <Separator/>
+                    <MenuItem Header="啟用側邊捲動" IsCheckable="True"
+                              IsChecked="{Binding Settings.IsEnabled, Mode=TwoWay}"/>
+                    <Separator/>
+                    <MenuItem Header="結束" Click="Exit_Click"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+    </Window.Resources>
+
+    <!-- 系統匣圖示 -->
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo/>
+    </Window.TaskbarItemInfo>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 標題列 -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                Padding="20,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Vertical">
+                    <TextBlock Text="Touchpad 側邊捲動"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="White"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Ellipse Style="{StaticResource StatusIndicatorStyle}"
+                                 Fill="{Binding Settings.IsEnabled, Converter={StaticResource BoolToBrushConverter}}"/>
+                        <TextBlock Text="{Binding StatusText}"
+                                   FontSize="14"
+                                   Foreground="White"
+                                   Opacity="0.9"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="重置設定"
+                            Command="{Binding ResetSettingsCommand}"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource AccentButtonStyle}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 主內容區 -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="20">
+            <StackPanel MaxWidth="800">
+
+                <!-- 主要開關 -->
+                <Border Style="{StaticResource InfoCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="側邊捲動功能"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"/>
+                            <TextBlock Text="在觸控板邊緣垂直滑動即可捲動頁面"
+                                       FontSize="13"
+                                       Foreground="White"
+                                       Opacity="0.8"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+
+                        <ui:ToggleSwitch Grid.Column="1"
+                                        IsOn="{Binding Settings.IsEnabled, Mode=TwoWay}"
+                                        OnContent="啟用"
+                                        OffContent="停用"
+                                        VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 觸控板資訊 -->
+                <TextBlock Text="觸控板資訊" Style="{StaticResource SubheaderTextStyle}"/>
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <TextBlock Text="{Binding TouchpadInfoText}"
+                               TextWrapping="Wrap"
+                               FontFamily="Consolas"
+                               FontSize="12"/>
+                </Border>
+
+                <!-- 捲動區設定 -->
+                <TextBlock Text="捲動區設定" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+
+                <!-- 捲動區寬度 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="捲動區寬度"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Slider Grid.Column="0"
+                                    Value="{Binding Settings.ScrollZoneWidth, Mode=TwoWay}"
+                                    Minimum="5"
+                                    Maximum="30"
+                                    TickFrequency="1"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Style="{StaticResource SliderValueStyle}"
+                                       Margin="12,0,0,0">
+                                <Run Text="{Binding Settings.ScrollZoneWidth, StringFormat='{}{0:F0}'}"/>
+                                <Run Text="%"/>
+                            </TextBlock>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="觸控板邊緣用於捲動的區域寬度"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 捲動區位置 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="捲動區位置"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Margin="0,8,0,0">
+                            <RadioButton Content="左側"
+                                        IsChecked="{Binding Settings.ScrollZonePosition,
+                                                    Converter={StaticResource EnumToBoolConverter},
+                                                    ConverterParameter=Left}"
+                                        Margin="0,0,16,0"/>
+                            <RadioButton Content="右側"
+                                        IsChecked="{Binding Settings.ScrollZonePosition,
+                                                    Converter={StaticResource EnumToBoolConverter},
+                                                    ConverterParameter=Right}"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="選擇觸控板左側或右側作為捲動區"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 捲動行為 -->
+                <TextBlock Text="捲動行為" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+
+                <!-- 捲動速度 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="捲動速度"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Slider Grid.Column="0"
+                                    Value="{Binding Settings.ScrollSpeed, Mode=TwoWay}"
+                                    Minimum="0.5"
+                                    Maximum="5.0"
+                                    TickFrequency="0.1"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Settings.ScrollSpeed, StringFormat='{}{0:F1}x'}"
+                                       Style="{StaticResource SliderValueStyle}"
+                                       Margin="12,0,0,0"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="調整捲動的速度倍率"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 捲動靈敏度 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="捲動靈敏度"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Slider Grid.Column="0"
+                                    Value="{Binding Settings.ScrollSensitivity, Mode=TwoWay}"
+                                    Minimum="0.1"
+                                    Maximum="5.0"
+                                    TickFrequency="0.1"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Settings.ScrollSensitivity, StringFormat='{}{0:F1}x'}"
+                                       Style="{StaticResource SliderValueStyle}"
+                                       Margin="12,0,0,0"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="調整觸發捲動所需的移動距離"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 反轉捲動方向 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <ui:ToggleSwitch IsOn="{Binding Settings.InvertScrollDirection, Mode=TwoWay}"
+                                    OnContent="已反轉"
+                                    OffContent="正常"
+                                    Header="反轉捲動方向"
+                                    HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
+                </Border>
+
+                <!-- 啟用水平捲動 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <ui:ToggleSwitch IsOn="{Binding Settings.EnableHorizontalScroll, Mode=TwoWay}"
+                                    Header="啟用水平捲動（實驗性功能）"
+                                    HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
+                </Border>
+
+                <!-- 進階設定 -->
+                <TextBlock Text="進階設定" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <StackPanel>
+                        <CheckBox Content="開機自動啟動"
+                                  IsChecked="{Binding Settings.StartWithWindows, Mode=TwoWay}"
+                                  Margin="0,0,0,8"/>
+                        <CheckBox Content="最小化到系統匣"
+                                  IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                                  Margin="0,0,0,8"/>
+                        <CheckBox Content="除錯模式（顯示觸控座標）"
+                                  IsChecked="{Binding Settings.DebugMode, Mode=TwoWay}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 除錯資訊 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.DebugMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Text="除錯資訊"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding DebugInfoText}"
+                                   FontFamily="Consolas"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 關於 -->
+                <TextBlock Text="關於" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Touchpad 側邊捲動 v1.0"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="使用 Precision Touchpad API 實作觸控板側邊捲動功能"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Margin="0,4,0,8"/>
+                        <TextBlock Style="{StaticResource CaptionTextStyle}">
+                            <Run Text="使用 Claude Code 建立"/>
+                            <Hyperlink NavigateUri="https://claude.com/claude-code" RequestNavigate="Hyperlink_RequestNavigate">
+                                <Run Text="了解更多"/>
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- 底部間距 -->
+                <Border Height="20"/>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
