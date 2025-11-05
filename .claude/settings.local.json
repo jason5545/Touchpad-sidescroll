@@ -13,7 +13,14 @@
       "Bash(dotnet build:*)",
       "Bash(tee:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(./TouchpadAdvancedTool.exe:*)",
+      "Bash(find:*)",
+      "Bash(tasklist /FI \"IMAGENAME eq TouchpadAdvancedTool.exe\")",
+      "Bash(cmd.exe /c \"tasklist | findstr TouchpadAdvancedTool\")"
     ],
     "deny": [],
     "ask": []

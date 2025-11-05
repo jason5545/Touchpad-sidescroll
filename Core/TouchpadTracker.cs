@@ -61,7 +61,7 @@ namespace TouchpadAdvancedTool.Core
             _touchpadInfo = args.TouchpadInfo;
 
             // 更新觸控點狀態
-            UpdateContacts(args.Contacts);
+            UpdateContacts(args.Contacts, settings);
 
             // 檢查觸控點數量是否符合設定
             if (_activeContacts.Count < settings.MinimumContactsForScroll ||
@@ -77,7 +77,29 @@ namespace TouchpadAdvancedTool.Core
             }
 
             // 取得主要觸控點（第一個有效觸控點）
-            _primaryContact = _activeContacts.Values.FirstOrDefault(c => c.IsTouching && c.Confidence);
+            // 優先選擇高信心的觸控點，但如果沒有，且觸控點在捲動區內，則使用低信心觸控點
+            var highConfidenceContact = _activeContacts.Values.FirstOrDefault(c => c.IsTouching && c.Confidence);
+            var anyTouchingContact = _activeContacts.Values.FirstOrDefault(c => c.IsTouching);
+
+            // 如果有高信心觸控點，使用它
+            if (highConfidenceContact != null)
+            {
+                _primaryContact = highConfidenceContact;
+            }
+            // 否則，檢查低信心觸控點是否在捲動區內
+            else if (anyTouchingContact != null && IsContactInScrollZone(anyTouchingContact, settings))
+            {
+                _primaryContact = anyTouchingContact;
+                if (settings.DebugMode)
+                {
+                    _logger.LogDebug("使用低信心觸控點（可能是邊緣觸控）：X={X}, Confidence={Confidence}",
+                        anyTouchingContact.X, anyTouchingContact.Confidence);
+                }
+            }
+            else
+            {
+                _primaryContact = null;
+            }
 
             if (_primaryContact == null)
             {
@@ -128,7 +150,7 @@ namespace TouchpadAdvancedTool.Core
         /// <summary>
         /// 更新觸控點狀態
         /// </summary>
-        private void UpdateContacts(List<ContactInfo> contacts)
+        private void UpdateContacts(List<ContactInfo> contacts, TouchpadSettings settings)
         {
             // 建立當前觸控點 ID 集合
             var currentContactIds = new HashSet<uint>();
@@ -146,8 +168,36 @@ namespace TouchpadAdvancedTool.Core
                 else
                 {
                     // 新觸控點，設定初始位置
+                    // 為了支援從側邊直接開始滑動，給新觸控點一個初始偏移
+                    // 這樣第一幀就能產生有效的 Delta，立即觸發捲動和視覺化
                     contact.LastX = contact.X;
                     contact.LastY = contact.Y;
+
+                    // 如果觸控板已初始化，給予智能初始偏移（僅支援右側捲動區）
+                    if (_touchpadInfo != null && _touchpadInfo.IsInitialized)
+                    {
+                        // 計算觸控點在觸控板上的相對位置（0-1）
+                        double xPercent = (double)(contact.X - _touchpadInfo.LogicalMinX) / _touchpadInfo.Width;
+
+                        // 給予一個初始偏移，讓第一幀就能產生滾動
+                        const int initialDelta = 20;
+
+                        // 右側捲動區：用戶通常從右往左滑（向內滑動）
+                        if (xPercent > 0.7) // 在右側
+                        {
+                            // 假設用戶將向左滑動，所以 LastX 應該在右邊
+                            contact.LastX = contact.X + initialDelta;
+                        }
+                        else
+                        {
+                            // 在中央或左側，可能是從中央滑過來的
+                            contact.LastX = contact.X - initialDelta;
+                        }
+
+                        // Y軸給予初始偏移，假設向下滑動（最常見的情況）
+                        // 這樣可以立即產生垂直捲動
+                        contact.LastY = contact.Y - initialDelta;
+                    }
                 }
 
                 _activeContacts[contact.Id] = contact;

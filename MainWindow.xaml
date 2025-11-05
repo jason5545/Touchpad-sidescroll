@@ -306,39 +306,6 @@
                     </Grid>
                 </Border>
 
-                <!-- 捲動區位置 -->
-                <Border Style="{StaticResource SettingItemStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0"
-                                   Text="捲動區位置"
-                                   Style="{StaticResource SliderLabelStyle}"/>
-
-                        <StackPanel Grid.Row="1"
-                                    Orientation="Horizontal"
-                                    Margin="0,8,0,0">
-                            <RadioButton Content="左側"
-                                        IsChecked="{Binding Settings.ScrollZonePosition,
-                                                    Converter={StaticResource EnumToBoolConverter},
-                                                    ConverterParameter=Left}"
-                                        Margin="0,0,16,0"/>
-                            <RadioButton Content="右側"
-                                        IsChecked="{Binding Settings.ScrollZonePosition,
-                                                    Converter={StaticResource EnumToBoolConverter},
-                                                    ConverterParameter=Right}"/>
-                        </StackPanel>
-
-                        <TextBlock Grid.Row="2"
-                                   Text="選擇觸控板左側或右側作為捲動區"
-                                   Style="{StaticResource CaptionTextStyle}"/>
-                    </Grid>
-                </Border>
-
                 <!-- 捲動行為 -->
                 <TextBlock Text="捲動行為" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
 

@@ -23,56 +23,80 @@ namespace TouchpadAdvancedTool
         /// </summary>
         protected override void OnStartup(StartupEventArgs e)
         {
-            // 檢查是否已有執行個體在執行（單一執行個體）
-            const string mutexName = "TouchpadAdvancedTool_SingleInstance_Mutex";
-            _mutex = new Mutex(true, mutexName, out bool createdNew);
-
-            if (!createdNew)
+            try
             {
-                MessageBox.Show(
-                    "Touchpad Advanced Tool 已在執行中。",
-                    "Touchpad Advanced Tool",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                Shutdown();
-                return;
+                // 檢查是否已有執行個體在執行（單一執行個體）
+                const string mutexName = "TouchpadAdvancedTool_SingleInstance_Mutex";
+                _mutex = new Mutex(true, mutexName, out bool createdNew);
+
+                if (!createdNew)
+                {
+                    MessageBox.Show(
+                        "Touchpad Advanced Tool 已在執行中。",
+                        "Touchpad Advanced Tool",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    Shutdown();
+                    return;
+                }
+
+                // 設定 Serilog
+                Log.Logger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .WriteTo.File(
+                        path: System.IO.Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "TouchpadAdvancedTool",
+                            "logs",
+                            "log-.txt"),
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 7)
+                    .CreateLogger();
+
+                Log.Information("應用程式啟動");
+
+                // 設定依賴注入
+                var services = new ServiceCollection();
+                ConfigureServices(services);
+                _serviceProvider = services.BuildServiceProvider();
+
+                // 處理未捕獲的例外狀況
+                DispatcherUnhandledException += (s, args) =>
+                {
+                    Log.Error(args.Exception, "未處理的例外狀況");
+                    MessageBox.Show(
+                        $"發生錯誤：{args.Exception.Message}\n\n詳細資訊：{args.Exception.StackTrace}",
+                        "錯誤",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    args.Handled = true;
+                };
+
+                base.OnStartup(e);
+
+                Log.Information("正在建立主視窗");
+                // 顯示主視窗
+                var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+                Log.Information("正在顯示主視窗");
+                mainWindow.Show();
+                Log.Information("主視窗已顯示");
             }
-
-            // 設定 Serilog
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.File(
-                    path: System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "TouchpadAdvancedTool",
-                        "logs",
-                        "log-.txt"),
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 7)
-                .CreateLogger();
-
-            // 設定依賴注入
-            var services = new ServiceCollection();
-            ConfigureServices(services);
-            _serviceProvider = services.BuildServiceProvider();
-
-            // 處理未捕獲的例外狀況
-            DispatcherUnhandledException += (s, args) =>
+            catch (Exception ex)
             {
-                Log.Error(args.Exception, "未處理的例外狀況");
                 MessageBox.Show(
-                    $"發生錯誤：{args.Exception.Message}",
-                    "錯誤",
+                    $"應用程式啟動失敗：{ex.Message}\n\n詳細資訊：\n{ex.StackTrace}",
+                    "嚴重錯誤",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-                args.Handled = true;
-            };
 
-            base.OnStartup(e);
+                try
+                {
+                    Log.Fatal(ex, "應用程式啟動失敗");
+                }
+                catch { }
 
-            // 顯示主視窗
-            var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
-            mainWindow.Show();
+                Shutdown();
+            }
         }
 
         /// <summary>

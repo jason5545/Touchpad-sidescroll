@@ -270,6 +270,12 @@ namespace TouchpadAdvancedTool
                 var touchpadInfo = e.TouchpadInfo;
                 var contacts = e.Contacts.Where(c => c.IsTouching && c.Confidence).ToList();
 
+                // 如果沒有高信心的觸控點，但有觸控，則使用全部（可能是從邊緣開始的觸控）
+                if (contacts.Count == 0)
+                {
+                    contacts = e.Contacts.Where(c => c.IsTouching).ToList();
+                }
+
                 TouchCountText.Text = contacts.Count.ToString();
 
                 if (contacts.Count > 0)

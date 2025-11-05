@@ -265,7 +265,8 @@ namespace TouchpadAdvancedTool.ViewModels
         private void OnExitScrollZone(object? sender, EventArgs args)
         {
             _logger.LogDebug("離開捲動區");
-            _scrollConverter.Reset();
+            // 啟動慣性捲動而不是直接重置
+            _scrollConverter.StartInertiaScroll();
         }
 
         /// <summary>

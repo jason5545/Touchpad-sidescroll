@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using TouchpadAdvancedTool.Models;
 using TouchpadAdvancedTool.Native;
@@ -16,7 +19,15 @@ namespace TouchpadAdvancedTool.Core
         private double _accumulatedDeltaY;
         private double _accumulatedDeltaX;
         private DateTime _lastScrollTime;
-        private const double MinScrollThreshold = 5.0; // 最小捲動閾值（觸控板原始單位）
+        private const double MinScrollThreshold = 1.0; // 最小捲動閾值（降低以提升流暢度）
+
+        // 慣性捲動相關
+        private readonly Queue<(double deltaY, DateTime time)> _velocityHistory = new(10);
+        private Timer? _inertiaTimer;
+        private double _currentVelocityY; // 像素/秒
+        private bool _isInertiaScrolling;
+        private TouchpadInfo? _lastTouchpadInfo;
+        private TouchpadSettings? _lastSettings;
 
         public ScrollConverter(ILogger<ScrollConverter> logger)
         {
@@ -30,9 +41,22 @@ namespace TouchpadAdvancedTool.Core
         {
             try
             {
+                // 如果正在慣性捲動，停止它（因為用戶重新開始手動控制）
+                if (_isInertiaScrolling)
+                {
+                    StopInertiaScroll();
+                }
+
+                // 儲存觸控板資訊和設定，供慣性捲動使用
+                _lastTouchpadInfo = args.TouchpadInfo;
+                _lastSettings = settings;
+
                 // 累積移動距離（支援反向設定）
                 int deltaY = settings.InvertScrollDirection ? -args.DeltaY : args.DeltaY;
                 int deltaX = settings.InvertHorizontalScroll ? -args.DeltaX : args.DeltaX;
+
+                // 更新速度歷史
+                UpdateVelocity(deltaY);
 
                 _accumulatedDeltaY += deltaY;
                 if (settings.EnableHorizontalScroll)
@@ -42,31 +66,45 @@ namespace TouchpadAdvancedTool.Core
 
                 // 計算每個 detent 需要的原始單位數
                 double rawPerDetent = ComputeRawUnitsPerDetent(args.TouchpadInfo, settings);
-                // 門檻：取 detent 的 1/4 或固定最小門檻較大值，避免過度敏感
-                double minThreshold = Math.Max(MinScrollThreshold, rawPerDetent * 0.25);
+                // 進一步降低閾值比例以提升流暢度（從 0.1 降到 0.05）
+                double minThreshold = Math.Max(MinScrollThreshold, rawPerDetent * 0.05);
 
                 int scrollUnitsY = 0;
                 int scrollUnitsX = 0;
 
                 if (Math.Abs(_accumulatedDeltaY) >= minThreshold)
                 {
-                    scrollUnitsY = (int)(_accumulatedDeltaY / rawPerDetent);
-                    if (scrollUnitsY != 0)
+                    // 使用浮點數計算，允許更精確的滾動
+                    double scrollUnitsYFloat = _accumulatedDeltaY / rawPerDetent;
+
+                    // 只有當累積到至少0.05個單位時才注入（更低的閾值）
+                    if (Math.Abs(scrollUnitsYFloat) >= 0.05)
                     {
-                        _accumulatedDeltaY -= scrollUnitsY * rawPerDetent; // 保留餘數
-                        if (settings.DebugMode)
-                            _logger.LogDebug("垂直: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaY, rawPerDetent, scrollUnitsY);
+                        scrollUnitsY = (int)Math.Round(scrollUnitsYFloat);
+                        if (scrollUnitsY != 0)
+                        {
+                            _accumulatedDeltaY -= scrollUnitsY * rawPerDetent; // 保留餘數
+                            if (settings.DebugMode)
+                                _logger.LogDebug("垂直: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaY, rawPerDetent, scrollUnitsY);
+                        }
                     }
                 }
 
                 if (settings.EnableHorizontalScroll && Math.Abs(_accumulatedDeltaX) >= minThreshold)
                 {
-                    scrollUnitsX = (int)(_accumulatedDeltaX / rawPerDetent);
-                    if (scrollUnitsX != 0)
+                    // 使用浮點數計算，允許更精確的滾動
+                    double scrollUnitsXFloat = _accumulatedDeltaX / rawPerDetent;
+
+                    // 只有當累積到至少0.05個單位時才注入（更低的閾值）
+                    if (Math.Abs(scrollUnitsXFloat) >= 0.05)
                     {
-                        _accumulatedDeltaX -= scrollUnitsX * rawPerDetent;
-                        if (settings.DebugMode)
-                            _logger.LogDebug("水平: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaX, rawPerDetent, scrollUnitsX);
+                        scrollUnitsX = (int)Math.Round(scrollUnitsXFloat);
+                        if (scrollUnitsX != 0)
+                        {
+                            _accumulatedDeltaX -= scrollUnitsX * rawPerDetent;
+                            if (settings.DebugMode)
+                                _logger.LogDebug("水平: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaX, rawPerDetent, scrollUnitsX);
+                        }
                     }
                 }
 
@@ -187,6 +225,166 @@ namespace TouchpadAdvancedTool.Core
         {
             _accumulatedDeltaY = 0.0;
             _accumulatedDeltaX = 0.0;
+            StopInertiaScroll();
+        }
+
+        /// <summary>
+        /// 更新速度歷史
+        /// </summary>
+        private void UpdateVelocity(double deltaY)
+        {
+            var now = DateTime.Now;
+            _velocityHistory.Enqueue((deltaY, now));
+
+            // 只保留最近100ms的歷史
+            while (_velocityHistory.Count > 0 && (now - _velocityHistory.Peek().time).TotalMilliseconds > 100)
+            {
+                _velocityHistory.Dequeue();
+            }
+
+            // 計算平均速度（像素/秒）
+            if (_velocityHistory.Count >= 2)
+            {
+                var first = _velocityHistory.First();
+                var last = _velocityHistory.Last();
+                double totalDelta = _velocityHistory.Sum(v => v.deltaY);
+                double totalTime = (last.time - first.time).TotalSeconds;
+
+                if (totalTime > 0)
+                {
+                    _currentVelocityY = totalDelta / totalTime;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 開始慣性捲動
+        /// </summary>
+        public void StartInertiaScroll()
+        {
+            // 停止現有的慣性捲動
+            StopInertiaScroll();
+
+            // 如果速度太小，不啟動慣性（閾值：500像素/秒）
+            if (Math.Abs(_currentVelocityY) < 500)
+            {
+                _logger.LogDebug("慣性速度太小，不啟動慣性捲動：{Velocity:F0}px/s", _currentVelocityY);
+                return;
+            }
+
+            _isInertiaScrolling = true;
+            _logger.LogDebug("開始慣性捲動，初始速度：{Velocity:F0}px/s", _currentVelocityY);
+
+            // 啟動定時器，每16ms（約60fps）執行一次慣性更新
+            _inertiaTimer = new Timer(InertiaScrollTick, null, 0, 16);
+        }
+
+        /// <summary>
+        /// 慣性捲動定時器回調
+        /// </summary>
+        private void InertiaScrollTick(object? state)
+        {
+            if (!_isInertiaScrolling) return;
+
+            try
+            {
+                // 減速係數：每秒減速到原速度的20%（模擬強摩擦力）
+                const double decayPerSecond = 0.20;
+                double decayPerFrame = Math.Pow(decayPerSecond, 16.0 / 1000.0); // 16ms一幀
+
+                _currentVelocityY *= decayPerFrame;
+
+                // 速度太小時停止（閾值：50像素/秒）
+                if (Math.Abs(_currentVelocityY) < 50)
+                {
+                    _logger.LogDebug("慣性速度降至閾值以下，停止慣性捲動");
+                    StopInertiaScroll();
+                    return;
+                }
+
+                // 計算這一幀應該移動的距離（像素）
+                double deltaThisFrame = _currentVelocityY * 0.016; // 16ms = 0.016秒
+
+                // 累積並計算是否注入滾輪事件
+                _accumulatedDeltaY += deltaThisFrame;
+
+                // 使用儲存的設定計算 rawPerDetent
+                if (_lastTouchpadInfo == null || _lastSettings == null)
+                {
+                    StopInertiaScroll();
+                    return;
+                }
+
+                double rawPerDetent = ComputeRawUnitsPerDetent(_lastTouchpadInfo, _lastSettings);
+                double minThreshold = Math.Max(MinScrollThreshold, rawPerDetent * 0.05);
+
+                if (Math.Abs(_accumulatedDeltaY) >= minThreshold)
+                {
+                    double scrollUnitsYFloat = _accumulatedDeltaY / rawPerDetent;
+
+                    if (Math.Abs(scrollUnitsYFloat) >= 0.05)
+                    {
+                        int scrollUnitsY = (int)Math.Round(scrollUnitsYFloat);
+                        if (scrollUnitsY != 0)
+                        {
+                            _accumulatedDeltaY -= scrollUnitsY * rawPerDetent;
+
+                            // 注入滾輪事件
+                            try
+                            {
+                                var input = new INPUT
+                                {
+                                    Type = INPUT_MOUSE,
+                                    Mouse = new MOUSEINPUT
+                                    {
+                                        X = 0,
+                                        Y = 0,
+                                        MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
+                                        Flags = MOUSEEVENTF_WHEEL,
+                                        Time = 0,
+                                        ExtraInfo = IntPtr.Zero
+                                    }
+                                };
+
+                                SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
+
+                                if (_lastSettings.DebugMode)
+                                {
+                                    _logger.LogDebug("慣性捲動注入：{Units} 單位，速度：{Velocity:F0}px/s",
+                                        scrollUnitsY, _currentVelocityY);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "慣性捲動注入滾輪事件失敗");
+                                StopInertiaScroll();
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "慣性捲動處理失敗");
+                StopInertiaScroll();
+            }
+        }
+
+        /// <summary>
+        /// 停止慣性捲動
+        /// </summary>
+        public void StopInertiaScroll()
+        {
+            if (_isInertiaScrolling)
+            {
+                _logger.LogDebug("停止慣性捲動");
+            }
+
+            _isInertiaScrolling = false;
+            _inertiaTimer?.Dispose();
+            _inertiaTimer = null;
+            _velocityHistory.Clear();
+            _currentVelocityY = 0;
         }
     }
 }
