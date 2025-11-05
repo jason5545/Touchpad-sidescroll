@@ -68,7 +68,10 @@ namespace TouchpadAdvancedTool
                 _viewModel.Settings.PropertyChanged += (s, e) =>
                 {
                     if (e.PropertyName == nameof(TouchpadSettings.ScrollZoneWidth) ||
-                        e.PropertyName == nameof(TouchpadSettings.ScrollZonePosition))
+                        e.PropertyName == nameof(TouchpadSettings.ScrollZonePosition) ||
+                        e.PropertyName == nameof(TouchpadSettings.HorizontalScrollZoneHeight) ||
+                        e.PropertyName == nameof(TouchpadSettings.HorizontalScrollZonePosition) ||
+                        e.PropertyName == nameof(TouchpadSettings.EnableHorizontalScroll))
                     {
                         UpdateScrollZoneVisualization();
                     }
@@ -381,17 +384,20 @@ namespace TouchpadAdvancedTool
                 return;
 
             var settings = _viewModel.Settings;
-            double zoneWidthPercent = settings.ScrollZoneWidth / 100.0;
             double canvasWidth = TouchpadCanvas.ActualWidth;
+            double canvasHeight = TouchpadCanvas.ActualHeight;
 
             if (canvasWidth == 0)
                 canvasWidth = 400; // 預設寬度
+            if (canvasHeight == 0)
+                canvasHeight = 200; // 預設高度
 
+            // 更新垂直捲動區
+            double zoneWidthPercent = settings.ScrollZoneWidth / 100.0;
             double zoneWidth = canvasWidth * zoneWidthPercent;
-            double zoneHeight = TouchpadCanvas.ActualHeight > 0 ? TouchpadCanvas.ActualHeight : 200;
 
             ScrollZoneRect.Width = zoneWidth;
-            ScrollZoneRect.Height = zoneHeight;
+            ScrollZoneRect.Height = canvasHeight;
 
             if (settings.ScrollZonePosition == ScrollZonePosition.Right)
             {
@@ -403,6 +409,33 @@ namespace TouchpadAdvancedTool
             }
 
             Canvas.SetTop(ScrollZoneRect, 0);
+
+            // 更新水平捲動區
+            if (settings.EnableHorizontalScroll)
+            {
+                HorizontalScrollZoneRect.Visibility = Visibility.Visible;
+
+                double zoneHeightPercent = settings.HorizontalScrollZoneHeight / 100.0;
+                double zoneHeight = canvasHeight * zoneHeightPercent;
+
+                HorizontalScrollZoneRect.Width = canvasWidth;
+                HorizontalScrollZoneRect.Height = zoneHeight;
+
+                Canvas.SetLeft(HorizontalScrollZoneRect, 0);
+
+                if (settings.HorizontalScrollZonePosition == HorizontalScrollZonePosition.Bottom)
+                {
+                    Canvas.SetTop(HorizontalScrollZoneRect, canvasHeight - zoneHeight);
+                }
+                else
+                {
+                    Canvas.SetTop(HorizontalScrollZoneRect, 0);
+                }
+            }
+            else
+            {
+                HorizontalScrollZoneRect.Visibility = Visibility.Collapsed;
+            }
         }
 
         /// <summary>
