@@ -43,6 +43,11 @@ namespace TouchpadAdvancedTool.Core
         public bool IsInScrollZone { get; private set; }
 
         /// <summary>
+        /// 當前捲動區類型
+        /// </summary>
+        public ScrollZoneType CurrentScrollZoneType { get; private set; } = ScrollZoneType.None;
+
+        /// <summary>
         /// 主要觸控點（用於游標移動）
         /// </summary>
         public ContactInfo? PrimaryContact => _primaryContact;
@@ -90,7 +95,8 @@ namespace TouchpadAdvancedTool.Core
             }
 
             // 檢查是否在捲動區內
-            bool inScrollZone = IsContactInScrollZone(_primaryContact, settings);
+            var scrollZoneType = GetScrollZoneType(_primaryContact, settings);
+            bool inScrollZone = scrollZoneType != ScrollZoneType.None;
 
             if (inScrollZone)
             {
@@ -99,13 +105,15 @@ namespace TouchpadAdvancedTool.Core
                     Contact = _primaryContact,
                     DeltaX = _primaryContact.DeltaX,
                     DeltaY = _primaryContact.DeltaY,
-                    TouchpadInfo = _touchpadInfo
+                    TouchpadInfo = _touchpadInfo,
+                    ZoneType = scrollZoneType
                 };
 
-                if (!IsInScrollZone)
+                if (!IsInScrollZone || CurrentScrollZoneType != scrollZoneType)
                 {
-                    // 進入捲動區
+                    // 進入捲動區或切換捲動區類型
                     IsInScrollZone = true;
+                    CurrentScrollZoneType = scrollZoneType;
                     EnterScrollZone?.Invoke(this, scrollArgs);
                 }
                 else
@@ -120,6 +128,7 @@ namespace TouchpadAdvancedTool.Core
                 {
                     // 離開捲動區
                     IsInScrollZone = false;
+                    CurrentScrollZoneType = ScrollZoneType.None;
                     ExitScrollZone?.Invoke(this, EventArgs.Empty);
                 }
             }
@@ -162,9 +171,32 @@ namespace TouchpadAdvancedTool.Core
         }
 
         /// <summary>
-        /// 檢查觸控點是否在捲動區內
+        /// 取得觸控點所在的捲動區類型
         /// </summary>
-        private bool IsContactInScrollZone(ContactInfo contact, TouchpadSettings settings)
+        private ScrollZoneType GetScrollZoneType(ContactInfo contact, TouchpadSettings settings)
+        {
+            if (_touchpadInfo == null || !_touchpadInfo.IsInitialized)
+                return ScrollZoneType.None;
+
+            // 優先檢查水平捲動區（如果啟用）
+            if (settings.EnableHorizontalScroll && IsContactInHorizontalScrollZone(contact, settings))
+            {
+                return ScrollZoneType.Horizontal;
+            }
+
+            // 檢查垂直捲動區
+            if (IsContactInVerticalScrollZone(contact, settings))
+            {
+                return ScrollZoneType.Vertical;
+            }
+
+            return ScrollZoneType.None;
+        }
+
+        /// <summary>
+        /// 檢查觸控點是否在垂直捲動區內
+        /// </summary>
+        private bool IsContactInVerticalScrollZone(ContactInfo contact, TouchpadSettings settings)
         {
             if (_touchpadInfo == null || !_touchpadInfo.IsInitialized)
                 return false;
@@ -191,6 +223,38 @@ namespace TouchpadAdvancedTool.Core
 
             // 檢查 X 座標是否在捲動區內
             return contact.X >= scrollZoneMinX && contact.X <= scrollZoneMaxX;
+        }
+
+        /// <summary>
+        /// 檢查觸控點是否在水平捲動區內
+        /// </summary>
+        private bool IsContactInHorizontalScrollZone(ContactInfo contact, TouchpadSettings settings)
+        {
+            if (_touchpadInfo == null || !_touchpadInfo.IsInitialized)
+                return false;
+
+            // 計算捲動區的 Y 座標範圍
+            int touchpadHeight = _touchpadInfo.Height;
+            double scrollZoneHeightPercent = settings.HorizontalScrollZoneHeight / 100.0;
+            int scrollZoneHeight = (int)(touchpadHeight * scrollZoneHeightPercent);
+
+            int scrollZoneMinY, scrollZoneMaxY;
+
+            if (settings.HorizontalScrollZonePosition == HorizontalScrollZonePosition.Bottom)
+            {
+                // 底部捲動區
+                scrollZoneMinY = _touchpadInfo.LogicalMaxY - scrollZoneHeight;
+                scrollZoneMaxY = _touchpadInfo.LogicalMaxY;
+            }
+            else
+            {
+                // 頂部捲動區
+                scrollZoneMinY = _touchpadInfo.LogicalMinY;
+                scrollZoneMaxY = _touchpadInfo.LogicalMinY + scrollZoneHeight;
+            }
+
+            // 檢查 Y 座標是否在捲動區內
+            return contact.Y >= scrollZoneMinY && contact.Y <= scrollZoneMaxY;
         }
 
         /// <summary>
@@ -297,5 +361,27 @@ namespace TouchpadAdvancedTool.Core
         public int DeltaX { get; init; }
         public int DeltaY { get; init; }
         public required TouchpadInfo TouchpadInfo { get; init; }
+        public ScrollZoneType ZoneType { get; init; } = ScrollZoneType.Vertical;
+    }
+
+    /// <summary>
+    /// 捲動區類型
+    /// </summary>
+    public enum ScrollZoneType
+    {
+        /// <summary>
+        /// 無捲動區
+        /// </summary>
+        None,
+
+        /// <summary>
+        /// 垂直捲動區（左側或右側）
+        /// </summary>
+        Vertical,
+
+        /// <summary>
+        /// 水平捲動區（頂部或底部）
+        /// </summary>
+        Horizontal
     }
 }

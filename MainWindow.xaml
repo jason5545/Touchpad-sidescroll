@@ -121,10 +121,23 @@
                             ClipToBounds="True"
                             SizeChanged="TouchpadCanvas_SizeChanged">
 
-                        <!-- 捲動區高亮 -->
+                        <!-- 垂直捲動區高亮 -->
                         <Rectangle x:Name="ScrollZoneRect"
                                    Fill="#30FFFFFF"
                                    Stroke="#60FFFFFF"
+                                   StrokeThickness="2"
+                                   RadiusX="8"
+                                   RadiusY="8"
+                                   Opacity="0.6">
+                            <Rectangle.Effect>
+                                <BlurEffect Radius="2"/>
+                            </Rectangle.Effect>
+                        </Rectangle>
+
+                        <!-- 水平捲動區高亮 -->
+                        <Rectangle x:Name="HorizontalScrollZoneRect"
+                                   Fill="#3000FFFF"
+                                   Stroke="#6000FFFF"
                                    StrokeThickness="2"
                                    RadiusX="8"
                                    RadiusY="8"
@@ -429,10 +442,118 @@
                                     HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
                 </Border>
 
-                <!-- 啟用水平捲動 -->
+                <!-- 水平捲動區設定 -->
+                <TextBlock Text="水平捲動區設定" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+
+                <!-- 啟用水平捲動區 -->
                 <Border Style="{StaticResource SettingItemStyle}">
-                    <ui:ToggleSwitch IsOn="{Binding Settings.EnableHorizontalScroll, Mode=TwoWay}"
-                                    Header="啟用水平捲動（實驗性功能）"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="水平捲動區"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="在觸控板頂部或底部水平滑動即可水平捲動"
+                                       FontSize="12"
+                                       Opacity="0.7"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+
+                        <ui:ToggleSwitch Grid.Column="1"
+                                        IsOn="{Binding Settings.EnableHorizontalScroll, Mode=TwoWay}"
+                                        OnContent="啟用"
+                                        OffContent="停用"
+                                        VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 水平捲動區高度 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableHorizontalScroll, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="水平捲動區高度"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Slider Grid.Column="0"
+                                    Value="{Binding Settings.HorizontalScrollZoneHeight, Mode=TwoWay}"
+                                    Minimum="5"
+                                    Maximum="30"
+                                    TickFrequency="1"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Style="{StaticResource SliderValueStyle}"
+                                       Margin="12,0,0,0">
+                                <Run Text="{Binding Settings.HorizontalScrollZoneHeight, StringFormat='{}{0:F0}'}"/>
+                                <Run Text="%"/>
+                            </TextBlock>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="觸控板頂部或底部用於水平捲動的區域高度"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 水平捲動區位置 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableHorizontalScroll, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="水平捲動區位置"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Margin="0,8,0,0">
+                            <RadioButton Content="頂部"
+                                        IsChecked="{Binding Settings.HorizontalScrollZonePosition,
+                                                    Converter={StaticResource EnumToBoolConverter},
+                                                    ConverterParameter=Top}"
+                                        Margin="0,0,16,0"/>
+                            <RadioButton Content="底部"
+                                        IsChecked="{Binding Settings.HorizontalScrollZonePosition,
+                                                    Converter={StaticResource EnumToBoolConverter},
+                                                    ConverterParameter=Bottom}"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="選擇觸控板頂部或底部作為水平捲動區"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 反轉水平捲動方向 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableHorizontalScroll, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ui:ToggleSwitch IsOn="{Binding Settings.InvertHorizontalScroll, Mode=TwoWay}"
+                                    OnContent="已反轉"
+                                    OffContent="正常"
+                                    Header="反轉水平捲動方向"
                                     HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
                 </Border>
 

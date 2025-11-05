@@ -30,50 +30,55 @@ namespace TouchpadAdvancedTool.Core
         {
             try
             {
-                // 累積移動距離（支援反向設定）
+                // 根據捲動區類型決定捲動方向
                 int deltaY = settings.InvertScrollDirection ? -args.DeltaY : args.DeltaY;
                 int deltaX = settings.InvertHorizontalScroll ? -args.DeltaX : args.DeltaX;
 
-                _accumulatedDeltaY += deltaY;
-                if (settings.EnableHorizontalScroll)
-                {
-                    _accumulatedDeltaX += deltaX;
-                }
+                int scrollUnitsY = 0;
+                int scrollUnitsX = 0;
 
                 // 計算每個 detent 需要的原始單位數
                 double rawPerDetent = ComputeRawUnitsPerDetent(args.TouchpadInfo, settings);
                 // 門檻：取 detent 的 1/4 或固定最小門檻較大值，避免過度敏感
                 double minThreshold = Math.Max(MinScrollThreshold, rawPerDetent * 0.25);
 
-                int scrollUnitsY = 0;
-                int scrollUnitsX = 0;
-
-                if (Math.Abs(_accumulatedDeltaY) >= minThreshold)
+                if (args.ZoneType == ScrollZoneType.Horizontal)
                 {
-                    scrollUnitsY = (int)(_accumulatedDeltaY / rawPerDetent);
-                    if (scrollUnitsY != 0)
+                    // 水平捲動區：主要使用 X 方向移動來產生水平捲動
+                    _accumulatedDeltaX += deltaX;
+
+                    if (Math.Abs(_accumulatedDeltaX) >= minThreshold)
                     {
-                        _accumulatedDeltaY -= scrollUnitsY * rawPerDetent; // 保留餘數
-                        if (settings.DebugMode)
-                            _logger.LogDebug("垂直: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaY, rawPerDetent, scrollUnitsY);
+                        scrollUnitsX = (int)(_accumulatedDeltaX / rawPerDetent);
+                        if (scrollUnitsX != 0)
+                        {
+                            _accumulatedDeltaX -= scrollUnitsX * rawPerDetent;
+                            if (settings.DebugMode)
+                                _logger.LogDebug("水平捲動區: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaX, rawPerDetent, scrollUnitsX);
+                        }
                     }
                 }
-
-                if (settings.EnableHorizontalScroll && Math.Abs(_accumulatedDeltaX) >= minThreshold)
+                else if (args.ZoneType == ScrollZoneType.Vertical)
                 {
-                    scrollUnitsX = (int)(_accumulatedDeltaX / rawPerDetent);
-                    if (scrollUnitsX != 0)
+                    // 垂直捲動區：主要使用 Y 方向移動來產生垂直捲動
+                    _accumulatedDeltaY += deltaY;
+
+                    if (Math.Abs(_accumulatedDeltaY) >= minThreshold)
                     {
-                        _accumulatedDeltaX -= scrollUnitsX * rawPerDetent;
-                        if (settings.DebugMode)
-                            _logger.LogDebug("水平: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaX, rawPerDetent, scrollUnitsX);
+                        scrollUnitsY = (int)(_accumulatedDeltaY / rawPerDetent);
+                        if (scrollUnitsY != 0)
+                        {
+                            _accumulatedDeltaY -= scrollUnitsY * rawPerDetent;
+                            if (settings.DebugMode)
+                                _logger.LogDebug("垂直捲動區: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaY, rawPerDetent, scrollUnitsY);
+                        }
                     }
                 }
 
                 // 注入滾輪事件
                 if (scrollUnitsY != 0 || scrollUnitsX != 0)
                 {
-                    InjectScrollEvent(scrollUnitsY, scrollUnitsX, settings);
+                    InjectScrollEvent(scrollUnitsY, scrollUnitsX, args.ZoneType, settings);
                     _lastScrollTime = DateTime.Now;
                 }
             }
@@ -110,7 +115,7 @@ namespace TouchpadAdvancedTool.Core
         /// <summary>
         /// 注入滾輪事件
         /// </summary>
-        private void InjectScrollEvent(int scrollUnitsY, int scrollUnitsX, TouchpadSettings settings)
+        private void InjectScrollEvent(int scrollUnitsY, int scrollUnitsX, ScrollZoneType zoneType, TouchpadSettings settings)
         {
             try
             {
@@ -145,7 +150,7 @@ namespace TouchpadAdvancedTool.Core
                 }
 
                 // 水平捲動
-                if (scrollUnitsX != 0 && settings.EnableHorizontalScroll)
+                if (scrollUnitsX != 0)
                 {
                     var input = new INPUT
                     {

@@ -21,6 +21,8 @@ namespace TouchpadAdvancedTool.Models
         private bool _enableHorizontalScroll = false;
         private bool _invertHorizontalScroll = false;
         private bool _showTouchVisualization = true;
+        private double _horizontalScrollZoneHeight = 15.0;
+        private HorizontalScrollZonePosition _horizontalScrollZonePosition = HorizontalScrollZonePosition.Top;
 
         private int _minimumContactsForScroll = 1;
         private int _maximumContactsForScroll = 1;
@@ -131,12 +133,35 @@ namespace TouchpadAdvancedTool.Models
         }
 
         /// <summary>
-        /// 啟用水平捲動
+        /// 啟用水平捲動區域
         /// </summary>
         public bool EnableHorizontalScroll
         {
             get => _enableHorizontalScroll;
             set => SetProperty(ref _enableHorizontalScroll, value);
+        }
+
+        /// <summary>
+        /// 水平捲動區高度（百分比：5-30）
+        /// </summary>
+        public double HorizontalScrollZoneHeight
+        {
+            get => _horizontalScrollZoneHeight;
+            set
+            {
+                if (value < 5.0) value = 5.0;
+                if (value > 30.0) value = 30.0;
+                SetProperty(ref _horizontalScrollZoneHeight, value);
+            }
+        }
+
+        /// <summary>
+        /// 水平捲動區位置
+        /// </summary>
+        public HorizontalScrollZonePosition HorizontalScrollZonePosition
+        {
+            get => _horizontalScrollZonePosition;
+            set => SetProperty(ref _horizontalScrollZonePosition, value);
         }
 
         /// <summary>
@@ -210,6 +235,22 @@ namespace TouchpadAdvancedTool.Models
         /// 右側
         /// </summary>
         Right
+    }
+
+    /// <summary>
+    /// 水平捲動區位置
+    /// </summary>
+    public enum HorizontalScrollZonePosition
+    {
+        /// <summary>
+        /// 頂部
+        /// </summary>
+        Top,
+
+        /// <summary>
+        /// 底部
+        /// </summary>
+        Bottom
     }
 
     /// <summary>
