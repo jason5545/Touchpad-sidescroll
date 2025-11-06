@@ -18,6 +18,16 @@ namespace TouchpadAdvancedTool.Core
         private ContactInfo? _primaryContact;
         private GestureRecognizer? _gestureRecognizer;
 
+        // 手勢狀態追蹤
+        private enum GestureState
+        {
+            None,           // 無手勢
+            CornerTap,      // 角落觸擊進行中
+            Scrolling       // 捲動進行中
+        }
+        private GestureState _currentGestureState = GestureState.None;
+        private uint _gestureContactId = 0; // 觸發手勢的觸點 ID
+
         /// <summary>
         /// 觸控點進入捲動區事件
         /// </summary>
@@ -84,8 +94,27 @@ namespace TouchpadAdvancedTool.Core
             // 更新觸控點狀態
             UpdateContacts(args.Contacts);
 
-            // 處理手勢偵測
+            // 處理手勢偵測（角落觸擊）
             _gestureRecognizer?.ProcessInput(args.Contacts);
+
+            // 檢查是否所有觸點都已離開（重置手勢狀態）
+            if (_activeContacts.Count == 0 || !_activeContacts.Values.Any(c => c.IsTouching))
+            {
+                if (_currentGestureState != GestureState.None)
+                {
+                    _logger.LogDebug($"所有觸點離開，重置手勢狀態：{_currentGestureState}");
+                    _currentGestureState = GestureState.None;
+                    _gestureContactId = 0;
+                }
+
+                if (IsInScrollZone)
+                {
+                    IsInScrollZone = false;
+                    CurrentScrollZoneType = ScrollZoneType.None;
+                    ExitScrollZone?.Invoke(this, EventArgs.Empty);
+                }
+                return;
+            }
 
             // 檢查觸控點數量是否符合設定
             if (_activeContacts.Count < settings.MinimumContactsForScroll ||
@@ -113,26 +142,99 @@ namespace TouchpadAdvancedTool.Core
                 return;
             }
 
-            // 檢查是否在捲動區內
-            var scrollZoneType = GetScrollZoneType(_primaryContact, settings);
-            bool inScrollZone = scrollZoneType != ScrollZoneType.None;
+            // === 手勢狀態管理與優先順序處理 ===
+
+            // 1. 檢查是否在角落區域開始觸控（優先順序最高）
+            if (_currentGestureState == GestureState.None &&
+                settings.EnableCornerTap &&
+                _gestureRecognizer != null &&
+                _gestureRecognizer.IsActiveCornerTap(_primaryContact.Id))
+            {
+                // 在角落區域開始觸控，進入角落觸擊狀態
+                _currentGestureState = GestureState.CornerTap;
+                _gestureContactId = _primaryContact.Id;
+                _logger.LogDebug($"進入角落觸擊狀態，觸點 ID: {_primaryContact.Id}");
+                return; // 不處理捲動
+            }
+
+            // 2. 如果已經在角落觸擊狀態中
+            if (_currentGestureState == GestureState.CornerTap)
+            {
+                // 檢查是否移動過多，如果是則轉換為捲動狀態
+                if (_gestureRecognizer != null &&
+                    !_gestureRecognizer.IsActiveCornerTap(_gestureContactId))
+                {
+                    // 角落觸擊已失效（移動過多），檢查是否應該轉換為捲動
+                    var scrollZoneType = GetScrollZoneType(_primaryContact, settings);
+                    if (scrollZoneType != ScrollZoneType.None)
+                    {
+                        _logger.LogDebug($"角落觸擊失效，轉換為捲動狀態");
+                        _currentGestureState = GestureState.Scrolling;
+                        _gestureContactId = _primaryContact.Id;
+
+                        // 取消角落觸擊
+                        _gestureRecognizer?.CancelCornerTap(_gestureContactId, "轉換為捲動");
+
+                        // 進入捲動區
+                        IsInScrollZone = true;
+                        CurrentScrollZoneType = scrollZoneType;
+                        EnterScrollZone?.Invoke(this, new ScrollZoneEventArgs
+                        {
+                            Contact = _primaryContact,
+                            DeltaX = _primaryContact.DeltaX,
+                            DeltaY = _primaryContact.DeltaY,
+                            TouchpadInfo = _touchpadInfo,
+                            ZoneType = scrollZoneType
+                        });
+                    }
+                    else
+                    {
+                        // 不在捲動區，重置狀態
+                        _currentGestureState = GestureState.None;
+                        _gestureContactId = 0;
+                    }
+                }
+                return; // 在角落觸擊狀態中，不處理捲動
+            }
+
+            // 3. 處理捲動邏輯
+            var currentScrollZoneType = GetScrollZoneType(_primaryContact, settings);
+            bool inScrollZone = currentScrollZoneType != ScrollZoneType.None;
 
             if (inScrollZone)
             {
+                // 檢查是否在角落區域（如果啟用角落觸擊，則排除角落區域）
+                if (settings.EnableCornerTap && IsInCornerZone(_primaryContact, settings))
+                {
+                    // 在角落區域，不觸發捲動（等待判斷是點擊還是滑動）
+                    if (_currentGestureState == GestureState.None)
+                    {
+                        return;
+                    }
+                }
+
+                // 進入或保持在捲動狀態
+                if (_currentGestureState == GestureState.None)
+                {
+                    _currentGestureState = GestureState.Scrolling;
+                    _gestureContactId = _primaryContact.Id;
+                    _logger.LogDebug($"進入捲動狀態，觸點 ID: {_primaryContact.Id}");
+                }
+
                 var scrollArgs = new ScrollZoneEventArgs
                 {
                     Contact = _primaryContact,
                     DeltaX = _primaryContact.DeltaX,
                     DeltaY = _primaryContact.DeltaY,
                     TouchpadInfo = _touchpadInfo,
-                    ZoneType = scrollZoneType
+                    ZoneType = currentScrollZoneType
                 };
 
-                if (!IsInScrollZone || CurrentScrollZoneType != scrollZoneType)
+                if (!IsInScrollZone || CurrentScrollZoneType != currentScrollZoneType)
                 {
                     // 進入捲動區或切換捲動區類型
                     IsInScrollZone = true;
-                    CurrentScrollZoneType = scrollZoneType;
+                    CurrentScrollZoneType = currentScrollZoneType;
                     EnterScrollZone?.Invoke(this, scrollArgs);
                 }
                 else
@@ -277,6 +379,33 @@ namespace TouchpadAdvancedTool.Core
         }
 
         /// <summary>
+        /// 檢查觸控點是否在角落區域內
+        /// </summary>
+        private bool IsInCornerZone(ContactInfo contact, TouchpadSettings settings)
+        {
+            if (_touchpadInfo == null || !_touchpadInfo.IsInitialized)
+                return false;
+
+            int touchpadWidth = _touchpadInfo.Width;
+            int touchpadHeight = _touchpadInfo.Height;
+
+            // 計算角落區域大小
+            int cornerWidth = (int)(touchpadWidth * settings.CornerTapSize / 100.0);
+            int cornerHeight = (int)(touchpadHeight * settings.CornerTapSize / 100.0);
+
+            // 判定左右
+            bool isLeft = contact.X <= _touchpadInfo.LogicalMinX + cornerWidth;
+            bool isRight = contact.X >= _touchpadInfo.LogicalMaxX - cornerWidth;
+
+            // 判定上下
+            bool isTop = contact.Y <= _touchpadInfo.LogicalMinY + cornerHeight;
+            bool isBottom = contact.Y >= _touchpadInfo.LogicalMaxY - cornerHeight;
+
+            // 判定角落（必須同時在兩個邊緣）
+            return (isLeft || isRight) && (isTop || isBottom);
+        }
+
+        /// <summary>
         /// 檢查滑鼠事件是否來自觸控板
         /// </summary>
         /// <param name="settings">觸控板設定（用於除錯模式）</param>
@@ -377,6 +506,8 @@ namespace TouchpadAdvancedTool.Core
             _activeContacts.Clear();
             _primaryContact = null;
             IsInScrollZone = false;
+            _currentGestureState = GestureState.None;
+            _gestureContactId = 0;
             _gestureRecognizer?.Reset();
         }
     }

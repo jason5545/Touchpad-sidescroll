@@ -69,6 +69,7 @@ public class GestureRecognizer
         public int StartX { get; set; }
         public int StartY { get; set; }
         public bool IsValidTap { get; set; }
+        public bool CancelledByScroll { get; set; } // 是否因為捲動而取消
     }
 
     public GestureRecognizer(TouchpadInfo touchpadInfo, TouchpadSettings settings)
@@ -83,6 +84,48 @@ public class GestureRecognizer
     public void UpdateSettings(TouchpadSettings settings)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+    }
+
+    /// <summary>
+    /// 檢查指定觸點是否在角落區域且正在進行有效的觸擊
+    /// </summary>
+    public bool IsActiveCornerTap(uint contactId)
+    {
+        return _contactTapStates.TryGetValue(contactId, out var state) &&
+               state.IsValidTap &&
+               !state.CancelledByScroll;
+    }
+
+    /// <summary>
+    /// 檢查是否有任何活動的角落觸擊
+    /// </summary>
+    public bool HasAnyActiveCornerTap()
+    {
+        return _contactTapStates.Values.Any(s => s.IsValidTap && !s.CancelledByScroll);
+    }
+
+    /// <summary>
+    /// 取消指定觸點的角落觸擊（因為開始捲動）
+    /// </summary>
+    public void CancelCornerTap(uint contactId, string reason = "")
+    {
+        if (_contactTapStates.TryGetValue(contactId, out var state))
+        {
+            if (state.IsValidTap && !state.CancelledByScroll)
+            {
+                state.IsValidTap = false;
+                state.CancelledByScroll = true;
+                Debug.WriteLine($"[GestureRecognizer] 觸點 {contactId} 的角落觸擊已取消: {reason}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 取得指定觸點所在的角落位置（如果有的話）
+    /// </summary>
+    public TouchpadCorner GetContactCorner(uint contactId)
+    {
+        return _contactTapStates.TryGetValue(contactId, out var state) ? state.Corner : TouchpadCorner.None;
     }
 
     /// <summary>
@@ -125,7 +168,8 @@ public class GestureRecognizer
                         TapStartTime = contact.Timestamp,
                         StartX = contact.X,
                         StartY = contact.Y,
-                        IsValidTap = true
+                        IsValidTap = true,
+                        CancelledByScroll = false
                     };
 
                     Debug.WriteLine($"[GestureRecognizer] 觸點 {contact.Id} 在角落 {corner} 開始觸擊");
