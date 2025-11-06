@@ -51,59 +51,62 @@ namespace TouchpadAdvancedTool.Core
                 _lastTouchpadInfo = args.TouchpadInfo;
                 _lastSettings = settings;
 
-                // 累積移動距離（支援反向設定）
+                // 根據捲動區類型決定捲動方向
                 int deltaY = settings.InvertScrollDirection ? -args.DeltaY : args.DeltaY;
                 int deltaX = settings.InvertHorizontalScroll ? -args.DeltaX : args.DeltaX;
 
                 // 更新速度歷史
                 UpdateVelocity(deltaY);
 
-                _accumulatedDeltaY += deltaY;
-                if (settings.EnableHorizontalScroll)
-                {
-                    _accumulatedDeltaX += deltaX;
-                }
+                int scrollUnitsY = 0;
+                int scrollUnitsX = 0;
 
                 // 計算每個 detent 需要的原始單位數
                 double rawPerDetent = ComputeRawUnitsPerDetent(args.TouchpadInfo, settings);
                 // 進一步降低閾值比例以提升流暢度（從 0.1 降到 0.05）
                 double minThreshold = Math.Max(MinScrollThreshold, rawPerDetent * 0.05);
 
-                int scrollUnitsY = 0;
-                int scrollUnitsX = 0;
-
-                if (Math.Abs(_accumulatedDeltaY) >= minThreshold)
+                if (args.ZoneType == ScrollZoneType.Horizontal)
                 {
-                    // 使用浮點數計算，允許更精確的滾動
-                    double scrollUnitsYFloat = _accumulatedDeltaY / rawPerDetent;
+                    // 水平捲動區：主要使用 X 方向移動來產生水平捲動
+                    _accumulatedDeltaX += deltaX;
 
-                    // 只有當累積到至少0.05個單位時才注入（更低的閾值）
-                    if (Math.Abs(scrollUnitsYFloat) >= 0.05)
+                    if (Math.Abs(_accumulatedDeltaX) >= minThreshold)
                     {
-                        scrollUnitsY = (int)Math.Round(scrollUnitsYFloat);
-                        if (scrollUnitsY != 0)
+                        double scrollUnitsXFloat = _accumulatedDeltaX / rawPerDetent;
+
+                        // 只有當累積到至少0.05個單位時才注入（更低的閾值）
+                        if (Math.Abs(scrollUnitsXFloat) >= 0.05)
                         {
-                            _accumulatedDeltaY -= scrollUnitsY * rawPerDetent; // 保留餘數
-                            if (settings.DebugMode)
-                                _logger.LogDebug("垂直: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaY, rawPerDetent, scrollUnitsY);
+                            scrollUnitsX = (int)Math.Round(scrollUnitsXFloat);
+                            if (scrollUnitsX != 0)
+                            {
+                                _accumulatedDeltaX -= scrollUnitsX * rawPerDetent; // 保留餘數
+                                if (settings.DebugMode)
+                                    _logger.LogDebug("水平捲動區: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaX, rawPerDetent, scrollUnitsX);
+                            }
                         }
                     }
                 }
-
-                if (settings.EnableHorizontalScroll && Math.Abs(_accumulatedDeltaX) >= minThreshold)
+                else if (args.ZoneType == ScrollZoneType.Vertical)
                 {
-                    // 使用浮點數計算，允許更精確的滾動
-                    double scrollUnitsXFloat = _accumulatedDeltaX / rawPerDetent;
+                    // 垂直捲動區：主要使用 Y 方向移動來產生垂直捲動
+                    _accumulatedDeltaY += deltaY;
 
-                    // 只有當累積到至少0.05個單位時才注入（更低的閾值）
-                    if (Math.Abs(scrollUnitsXFloat) >= 0.05)
+                    if (Math.Abs(_accumulatedDeltaY) >= minThreshold)
                     {
-                        scrollUnitsX = (int)Math.Round(scrollUnitsXFloat);
-                        if (scrollUnitsX != 0)
+                        double scrollUnitsYFloat = _accumulatedDeltaY / rawPerDetent;
+
+                        // 只有當累積到至少0.05個單位時才注入（更低的閾值）
+                        if (Math.Abs(scrollUnitsYFloat) >= 0.05)
                         {
-                            _accumulatedDeltaX -= scrollUnitsX * rawPerDetent;
-                            if (settings.DebugMode)
-                                _logger.LogDebug("水平: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaX, rawPerDetent, scrollUnitsX);
+                            scrollUnitsY = (int)Math.Round(scrollUnitsYFloat);
+                            if (scrollUnitsY != 0)
+                            {
+                                _accumulatedDeltaY -= scrollUnitsY * rawPerDetent; // 保留餘數
+                                if (settings.DebugMode)
+                                    _logger.LogDebug("垂直捲動區: 累積={Accum:F2}, detentRaw={Detent:F2}, 注入={Units}", _accumulatedDeltaY, rawPerDetent, scrollUnitsY);
+                            }
                         }
                     }
                 }
@@ -111,7 +114,7 @@ namespace TouchpadAdvancedTool.Core
                 // 注入滾輪事件
                 if (scrollUnitsY != 0 || scrollUnitsX != 0)
                 {
-                    InjectScrollEvent(scrollUnitsY, scrollUnitsX, settings);
+                    InjectScrollEvent(scrollUnitsY, scrollUnitsX, args.ZoneType, settings);
                     _lastScrollTime = DateTime.Now;
                 }
             }
@@ -148,7 +151,7 @@ namespace TouchpadAdvancedTool.Core
         /// <summary>
         /// 注入滾輪事件
         /// </summary>
-        private void InjectScrollEvent(int scrollUnitsY, int scrollUnitsX, TouchpadSettings settings)
+        private void InjectScrollEvent(int scrollUnitsY, int scrollUnitsX, ScrollZoneType zoneType, TouchpadSettings settings)
         {
             try
             {
@@ -158,14 +161,17 @@ namespace TouchpadAdvancedTool.Core
                     var input = new INPUT
                     {
                         Type = INPUT_MOUSE,
-                        Mouse = new MOUSEINPUT
+                        U = new InputUnion
                         {
-                            X = 0,
-                            Y = 0,
-                            MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
-                            Flags = MOUSEEVENTF_WHEEL,
-                            Time = 0,
-                            ExtraInfo = IntPtr.Zero
+                            mi = new MOUSEINPUT
+                            {
+                                X = 0,
+                                Y = 0,
+                                MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
+                                Flags = MOUSEEVENTF_WHEEL,
+                                Time = 0,
+                                ExtraInfo = IntPtr.Zero
+                            }
                         }
                     };
 
@@ -183,19 +189,22 @@ namespace TouchpadAdvancedTool.Core
                 }
 
                 // 水平捲動
-                if (scrollUnitsX != 0 && settings.EnableHorizontalScroll)
+                if (scrollUnitsX != 0)
                 {
                     var input = new INPUT
                     {
                         Type = INPUT_MOUSE,
-                        Mouse = new MOUSEINPUT
+                        U = new InputUnion
                         {
-                            X = 0,
-                            Y = 0,
-                            MouseData = (uint)(scrollUnitsX * WHEEL_DELTA),
-                            Flags = MOUSEEVENTF_HWHEEL,
-                            Time = 0,
-                            ExtraInfo = IntPtr.Zero
+                            mi = new MOUSEINPUT
+                            {
+                                X = 0,
+                                Y = 0,
+                                MouseData = (uint)(scrollUnitsX * WHEEL_DELTA),
+                                Flags = MOUSEEVENTF_HWHEEL,
+                                Time = 0,
+                                ExtraInfo = IntPtr.Zero
+                            }
                         }
                     };
 
@@ -335,14 +344,17 @@ namespace TouchpadAdvancedTool.Core
                                 var input = new INPUT
                                 {
                                     Type = INPUT_MOUSE,
-                                    Mouse = new MOUSEINPUT
+                                    U = new InputUnion
                                     {
-                                        X = 0,
-                                        Y = 0,
-                                        MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
-                                        Flags = MOUSEEVENTF_WHEEL,
-                                        Time = 0,
-                                        ExtraInfo = IntPtr.Zero
+                                        mi = new MOUSEINPUT
+                                        {
+                                            X = 0,
+                                            Y = 0,
+                                            MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
+                                            Flags = MOUSEEVENTF_WHEEL,
+                                            Time = 0,
+                                            ExtraInfo = IntPtr.Zero
+                                        }
                                     }
                                 };
 

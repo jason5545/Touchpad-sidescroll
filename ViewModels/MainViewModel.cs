@@ -21,6 +21,7 @@ namespace TouchpadAdvancedTool.ViewModels
         private readonly MouseHookManager _mouseHookManager;
         private readonly TouchpadTracker _touchpadTracker;
         private readonly ScrollConverter _scrollConverter;
+        private readonly CornerActionExecutor _cornerActionExecutor;
 
         private string _statusText = "初始化中...";
         private string _touchpadInfoText = "未偵測到觸控板";
@@ -97,6 +98,7 @@ namespace TouchpadAdvancedTool.ViewModels
             _mouseHookManager = mouseHookManager;
             _touchpadTracker = touchpadTracker;
             _scrollConverter = scrollConverter;
+            _cornerActionExecutor = new CornerActionExecutor();
 
             Settings = settingsManager.Settings;
 
@@ -111,6 +113,7 @@ namespace TouchpadAdvancedTool.ViewModels
             _touchpadTracker.EnterScrollZone += OnEnterScrollZone;
             _touchpadTracker.ExitScrollZone += OnExitScrollZone;
             _touchpadTracker.ScrollZoneMove += OnScrollZoneMove;
+            _touchpadTracker.CornerTap += OnCornerTap;
             _mouseHookManager.InterceptRequest += OnInterceptRequest;
 
             Settings.PropertyChanged += OnSettingsPropertyChanged;
@@ -292,6 +295,33 @@ namespace TouchpadAdvancedTool.ViewModels
             if (_touchpadTracker.IsInScrollZone && _touchpadTracker.IsMouseEventFromTouchpad(Settings))
             {
                 args.ShouldIntercept = true;
+            }
+        }
+
+        /// <summary>
+        /// 角落觸擊事件
+        /// </summary>
+        private void OnCornerTap(object? sender, CornerTapEventArgs args)
+        {
+            if (!Settings.IsEnabled || !Settings.EnableCornerTap)
+                return;
+
+            _logger.LogDebug($"偵測到角落觸擊: {args.Corner}");
+
+            // 根據角落位置取得對應的動作
+            CornerAction action = args.Corner switch
+            {
+                TouchpadCorner.TopLeft => Settings.TopLeftAction,
+                TouchpadCorner.TopRight => Settings.TopRightAction,
+                TouchpadCorner.BottomLeft => Settings.BottomLeftAction,
+                TouchpadCorner.BottomRight => Settings.BottomRightAction,
+                _ => CornerAction.None
+            };
+
+            if (action != CornerAction.None)
+            {
+                _logger.LogInformation($"執行角落動作: {args.Corner} -> {action}");
+                _cornerActionExecutor.ExecuteAction(action);
             }
         }
 

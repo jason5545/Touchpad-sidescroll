@@ -68,7 +68,10 @@ namespace TouchpadAdvancedTool
                 _viewModel.Settings.PropertyChanged += (s, e) =>
                 {
                     if (e.PropertyName == nameof(TouchpadSettings.ScrollZoneWidth) ||
-                        e.PropertyName == nameof(TouchpadSettings.ScrollZonePosition))
+                        e.PropertyName == nameof(TouchpadSettings.ScrollZonePosition) ||
+                        e.PropertyName == nameof(TouchpadSettings.HorizontalScrollZoneHeight) ||
+                        e.PropertyName == nameof(TouchpadSettings.HorizontalScrollZonePosition) ||
+                        e.PropertyName == nameof(TouchpadSettings.EnableHorizontalScroll))
                     {
                         UpdateScrollZoneVisualization();
                     }
@@ -387,17 +390,20 @@ namespace TouchpadAdvancedTool
                 return;
 
             var settings = _viewModel.Settings;
-            double zoneWidthPercent = settings.ScrollZoneWidth / 100.0;
             double canvasWidth = TouchpadCanvas.ActualWidth;
+            double canvasHeight = TouchpadCanvas.ActualHeight;
 
             if (canvasWidth == 0)
                 canvasWidth = 400; // 預設寬度
+            if (canvasHeight == 0)
+                canvasHeight = 200; // 預設高度
 
+            // 更新垂直捲動區
+            double zoneWidthPercent = settings.ScrollZoneWidth / 100.0;
             double zoneWidth = canvasWidth * zoneWidthPercent;
-            double zoneHeight = TouchpadCanvas.ActualHeight > 0 ? TouchpadCanvas.ActualHeight : 200;
 
             ScrollZoneRect.Width = zoneWidth;
-            ScrollZoneRect.Height = zoneHeight;
+            ScrollZoneRect.Height = canvasHeight;
 
             if (settings.ScrollZonePosition == ScrollZonePosition.Right)
             {
@@ -409,6 +415,33 @@ namespace TouchpadAdvancedTool
             }
 
             Canvas.SetTop(ScrollZoneRect, 0);
+
+            // 更新水平捲動區
+            if (settings.EnableHorizontalScroll)
+            {
+                HorizontalScrollZoneRect.Visibility = Visibility.Visible;
+
+                double zoneHeightPercent = settings.HorizontalScrollZoneHeight / 100.0;
+                double zoneHeight = canvasHeight * zoneHeightPercent;
+
+                HorizontalScrollZoneRect.Width = canvasWidth;
+                HorizontalScrollZoneRect.Height = zoneHeight;
+
+                Canvas.SetLeft(HorizontalScrollZoneRect, 0);
+
+                if (settings.HorizontalScrollZonePosition == HorizontalScrollZonePosition.Bottom)
+                {
+                    Canvas.SetTop(HorizontalScrollZoneRect, canvasHeight - zoneHeight);
+                }
+                else
+                {
+                    Canvas.SetTop(HorizontalScrollZoneRect, 0);
+                }
+            }
+            else
+            {
+                HorizontalScrollZoneRect.Visibility = Visibility.Collapsed;
+            }
         }
 
         /// <summary>
@@ -467,6 +500,60 @@ namespace TouchpadAdvancedTool
                 return Enum.Parse(targetType, parameter.ToString()!);
             }
             return Binding.DoNothing;
+        }
+    }
+
+    /// <summary>
+    /// Enum 值列表轉換器（用於 ComboBox）
+    /// </summary>
+    public class EnumValuesConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is Type enumType && enumType.IsEnum)
+            {
+                return Enum.GetValues(enumType);
+            }
+            return Array.Empty<object>();
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// CornerAction 顯示文字轉換器
+    /// </summary>
+    public class CornerActionDisplayConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is CornerAction action)
+            {
+                return action switch
+                {
+                    CornerAction.None => "無動作",
+                    CornerAction.ShowDesktop => "顯示桌面",
+                    CornerAction.TaskView => "工作檢視",
+                    CornerAction.ActionCenter => "動作中心",
+                    CornerAction.MediaPlayPause => "播放/暫停",
+                    CornerAction.MediaNextTrack => "下一首",
+                    CornerAction.MediaPreviousTrack => "上一首",
+                    CornerAction.VolumeMute => "靜音",
+                    CornerAction.ScreenSnip => "螢幕擷取",
+                    CornerAction.RightClick => "滑鼠右鍵",
+                    CornerAction.CustomCommand => "自訂指令",
+                    _ => action.ToString()
+                };
+            }
+            return value?.ToString() ?? string.Empty;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 

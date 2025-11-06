@@ -371,7 +371,7 @@ namespace TouchpadAdvancedTool.Native
     #region Input Simulation Structures
 
     /// <summary>
-    /// 輸入結構
+    /// 輸入結構（支援滑鼠和鍵盤）
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct INPUT
@@ -382,9 +382,28 @@ namespace TouchpadAdvancedTool.Native
         public uint Type;
 
         /// <summary>
-        /// 輸入聯合（僅使用 Mouse）
+        /// 輸入聯合（包含滑鼠和鍵盤）
         /// </summary>
-        public MOUSEINPUT Mouse;
+        public InputUnion U;
+    }
+
+    /// <summary>
+    /// 輸入聯合
+    /// </summary>
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InputUnion
+    {
+        /// <summary>
+        /// 滑鼠輸入
+        /// </summary>
+        [FieldOffset(0)]
+        public MOUSEINPUT mi;
+
+        /// <summary>
+        /// 鍵盤輸入
+        /// </summary>
+        [FieldOffset(0)]
+        public KEYBDINPUT ki;
     }
 
     /// <summary>
@@ -422,6 +441,38 @@ namespace TouchpadAdvancedTool.Native
         /// 額外資訊
         /// </summary>
         public IntPtr ExtraInfo;
+    }
+
+    /// <summary>
+    /// 鍵盤輸入
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KEYBDINPUT
+    {
+        /// <summary>
+        /// 虛擬鍵碼
+        /// </summary>
+        public ushort wVk;
+
+        /// <summary>
+        /// 硬體掃描碼
+        /// </summary>
+        public ushort wScan;
+
+        /// <summary>
+        /// 旗標
+        /// </summary>
+        public uint dwFlags;
+
+        /// <summary>
+        /// 時間戳記（0 表示使用系統時間）
+        /// </summary>
+        public uint time;
+
+        /// <summary>
+        /// 額外資訊
+        /// </summary>
+        public IntPtr dwExtraInfo;
     }
 
     #endregion

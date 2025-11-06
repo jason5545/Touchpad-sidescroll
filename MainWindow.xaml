@@ -6,6 +6,7 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:local="clr-namespace:TouchpadAdvancedTool"
+        xmlns:models="clr-namespace:TouchpadAdvancedTool.Models"
         mc:Ignorable="d"
         Title="Touchpad Advanced Tool"
         Height="700"
@@ -25,6 +26,12 @@
 
         <!-- 值轉換器：Enum 轉 Bool -->
         <local:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+
+        <!-- 值轉換器：Enum 值列表 -->
+        <local:EnumValuesConverter x:Key="EnumValuesConverter"/>
+
+        <!-- 值轉換器：CornerAction 顯示文字 -->
+        <local:CornerActionDisplayConverter x:Key="CornerActionDisplayConverter"/>
 
         <!-- ToggleSwitch 標題模板 -->
         <DataTemplate x:Key="ToggleSwitchHeaderTemplate">
@@ -121,10 +128,23 @@
                             ClipToBounds="True"
                             SizeChanged="TouchpadCanvas_SizeChanged">
 
-                        <!-- 捲動區高亮 -->
+                        <!-- 垂直捲動區高亮 -->
                         <Rectangle x:Name="ScrollZoneRect"
                                    Fill="#30FFFFFF"
                                    Stroke="#60FFFFFF"
+                                   StrokeThickness="2"
+                                   RadiusX="8"
+                                   RadiusY="8"
+                                   Opacity="0.6">
+                            <Rectangle.Effect>
+                                <BlurEffect Radius="2"/>
+                            </Rectangle.Effect>
+                        </Rectangle>
+
+                        <!-- 水平捲動區高亮 -->
+                        <Rectangle x:Name="HorizontalScrollZoneRect"
+                                   Fill="#3000FFFF"
+                                   Stroke="#6000FFFF"
                                    StrokeThickness="2"
                                    RadiusX="8"
                                    RadiusY="8"
@@ -396,11 +416,295 @@
                                     HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
                 </Border>
 
-                <!-- 啟用水平捲動 -->
+                <!-- 水平捲動區設定 -->
+                <TextBlock Text="水平捲動區設定" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+
+                <!-- 啟用水平捲動區 -->
                 <Border Style="{StaticResource SettingItemStyle}">
-                    <ui:ToggleSwitch IsOn="{Binding Settings.EnableHorizontalScroll, Mode=TwoWay}"
-                                    Header="啟用水平捲動（實驗性功能）"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="水平捲動區"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="在觸控板頂部或底部水平滑動即可水平捲動"
+                                       FontSize="12"
+                                       Opacity="0.7"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+
+                        <ui:ToggleSwitch Grid.Column="1"
+                                        IsOn="{Binding Settings.EnableHorizontalScroll, Mode=TwoWay}"
+                                        OnContent="啟用"
+                                        OffContent="停用"
+                                        VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 水平捲動區高度 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableHorizontalScroll, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="水平捲動區高度"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Slider Grid.Column="0"
+                                    Value="{Binding Settings.HorizontalScrollZoneHeight, Mode=TwoWay}"
+                                    Minimum="5"
+                                    Maximum="30"
+                                    TickFrequency="1"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Style="{StaticResource SliderValueStyle}"
+                                       Margin="12,0,0,0">
+                                <Run Text="{Binding Settings.HorizontalScrollZoneHeight, StringFormat='{}{0:F0}'}"/>
+                                <Run Text="%"/>
+                            </TextBlock>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="觸控板頂部或底部用於水平捲動的區域高度"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 水平捲動區位置 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableHorizontalScroll, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="水平捲動區位置"
+                                   Style="{StaticResource SliderLabelStyle}"/>
+
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Margin="0,8,0,0">
+                            <RadioButton Content="頂部"
+                                        IsChecked="{Binding Settings.HorizontalScrollZonePosition,
+                                                    Converter={StaticResource EnumToBoolConverter},
+                                                    ConverterParameter=Top}"
+                                        Margin="0,0,16,0"/>
+                            <RadioButton Content="底部"
+                                        IsChecked="{Binding Settings.HorizontalScrollZonePosition,
+                                                    Converter={StaticResource EnumToBoolConverter},
+                                                    ConverterParameter=Bottom}"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="選擇觸控板頂部或底部作為水平捲動區"
+                                   Style="{StaticResource CaptionTextStyle}"/>
+                    </Grid>
+                </Border>
+
+                <!-- 反轉水平捲動方向 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableHorizontalScroll, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ui:ToggleSwitch IsOn="{Binding Settings.InvertHorizontalScroll, Mode=TwoWay}"
+                                    OnContent="已反轉"
+                                    OffContent="正常"
+                                    Header="反轉水平捲動方向"
                                     HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
+                </Border>
+
+                <!-- 角落觸擊設定 -->
+                <TextBlock Text="角落觸擊設定" Style="{StaticResource SubheaderTextStyle}" Margin="0,16,0,8"/>
+
+                <!-- 啟用角落觸擊 -->
+                <Border Style="{StaticResource SettingItemStyle}">
+                    <ui:ToggleSwitch IsOn="{Binding Settings.EnableCornerTap, Mode=TwoWay}"
+                                    OnContent="已啟用"
+                                    OffContent="已停用"
+                                    Header="啟用角落觸擊功能"
+                                    HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"/>
+                </Border>
+
+                <!-- 角落觸擊參數 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableCornerTap, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <!-- 角落區域大小 -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="角落區域大小"
+                                       Style="{StaticResource SliderLabelStyle}"/>
+
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Slider Grid.Column="0"
+                                        Value="{Binding Settings.CornerTapSize, Mode=TwoWay}"
+                                        Minimum="5"
+                                        Maximum="20"
+                                        TickFrequency="1"
+                                        IsSnapToTickEnabled="True"/>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Settings.CornerTapSize, StringFormat={}{0:F0}%}"
+                                           Style="{StaticResource SliderValueStyle}"/>
+                            </Grid>
+                        </Grid>
+
+                        <!-- 觸擊時長 -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="最大觸擊時長"
+                                       Style="{StaticResource SliderLabelStyle}"/>
+
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Slider Grid.Column="0"
+                                        Value="{Binding Settings.CornerTapMaxDuration, Mode=TwoWay}"
+                                        Minimum="100"
+                                        Maximum="1000"
+                                        TickFrequency="50"
+                                        IsSnapToTickEnabled="True"/>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Settings.CornerTapMaxDuration, StringFormat={}{0:F0}ms}"
+                                           Style="{StaticResource SliderValueStyle}"/>
+                            </Grid>
+                        </Grid>
+
+                        <!-- 移動閾值 -->
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="移動容許範圍"
+                                       Style="{StaticResource SliderLabelStyle}"/>
+
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Slider Grid.Column="0"
+                                        Value="{Binding Settings.CornerTapMovementThreshold, Mode=TwoWay}"
+                                        Minimum="1"
+                                        Maximum="10"
+                                        TickFrequency="0.5"
+                                        IsSnapToTickEnabled="True"/>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Settings.CornerTapMovementThreshold, StringFormat={}{0:F1}%}"
+                                           Style="{StaticResource SliderValueStyle}"/>
+                            </Grid>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 角落動作設定 -->
+                <Border Style="{StaticResource SettingItemStyle}"
+                        Visibility="{Binding Settings.EnableCornerTap, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 左上角 -->
+                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,12">
+                            <TextBlock Text="左上角" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <ComboBox SelectedItem="{Binding Settings.TopLeftAction, Mode=TwoWay}"
+                                      ItemsSource="{Binding Source={x:Type models:CornerAction}, Converter={StaticResource EnumValuesConverter}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource CornerActionDisplayConverter}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- 右上角 -->
+                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,12">
+                            <TextBlock Text="右上角" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <ComboBox SelectedItem="{Binding Settings.TopRightAction, Mode=TwoWay}"
+                                      ItemsSource="{Binding Source={x:Type models:CornerAction}, Converter={StaticResource EnumValuesConverter}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource CornerActionDisplayConverter}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- 左下角 -->
+                        <StackPanel Grid.Row="1" Grid.Column="0">
+                            <TextBlock Text="左下角" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <ComboBox SelectedItem="{Binding Settings.BottomLeftAction, Mode=TwoWay}"
+                                      ItemsSource="{Binding Source={x:Type models:CornerAction}, Converter={StaticResource EnumValuesConverter}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource CornerActionDisplayConverter}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- 右下角 -->
+                        <StackPanel Grid.Row="1" Grid.Column="2">
+                            <TextBlock Text="右下角" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <ComboBox SelectedItem="{Binding Settings.BottomRightAction, Mode=TwoWay}"
+                                      ItemsSource="{Binding Source={x:Type models:CornerAction}, Converter={StaticResource EnumValuesConverter}}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource CornerActionDisplayConverter}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <!-- 進階設定 -->
