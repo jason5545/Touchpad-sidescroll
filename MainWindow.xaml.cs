@@ -358,6 +358,13 @@ namespace TouchpadAdvancedTool
             if (!_viewModel?.Settings.ShowTouchVisualization ?? true)
                 return;
 
+            // 獲取 TouchpadTracker 以檢查狀態
+            var touchpadTracker = App.GetService<TouchpadTracker>();
+
+            // 只有在真正處於捲動區內時才更新狀態
+            if (!touchpadTracker.IsInScrollZone)
+                return;
+
             Dispatcher.Invoke(() =>
             {
                 // 只有在真正捲動時才顯示"捲動中"
