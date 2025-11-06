@@ -365,6 +365,11 @@ namespace TouchpadAdvancedTool
             if (!touchpadTracker.IsInScrollZone)
                 return;
 
+            // 檢查是否有實際的移動量（避免剛進入時的微小移動就顯示捲動中）
+            bool hasSignificantMovement = Math.Abs(e.DeltaX) > 5 || Math.Abs(e.DeltaY) > 5;
+            if (!hasSignificantMovement)
+                return;
+
             Dispatcher.Invoke(() =>
             {
                 // 只有在真正捲動時才顯示"捲動中"
