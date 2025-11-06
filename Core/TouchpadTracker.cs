@@ -222,16 +222,17 @@ namespace TouchpadAdvancedTool.Core
             }
 
             // 3. 處理捲動邏輯
+            // 快速路徑：如果已經在 NormalCursor 狀態，直接返回，不需要進行區域判斷
+            if (_currentGestureState == GestureState.NormalCursor)
+            {
+                return;
+            }
+
             var currentScrollZoneType = GetScrollZoneType(_primaryContact, settings);
             bool inScrollZone = currentScrollZoneType != ScrollZoneType.None;
 
             if (inScrollZone)
             {
-                // 如果已經在 NormalCursor 狀態，不允許再次進入捲動
-                if (_currentGestureState == GestureState.NormalCursor)
-                {
-                    return;
-                }
 
                 // 檢查是否在角落區域（如果啟用角落觸擊，則排除角落區域）
                 if (settings.EnableCornerTap && IsInCornerZone(_primaryContact, settings))
