@@ -16,6 +16,7 @@ namespace TouchpadAdvancedTool.Core
         private DateTime _lastTouchpadEventTime;
         private TouchpadInfo? _touchpadInfo;
         private ContactInfo? _primaryContact;
+        private GestureRecognizer? _gestureRecognizer;
 
         /// <summary>
         /// 觸控點進入捲動區事件
@@ -31,6 +32,11 @@ namespace TouchpadAdvancedTool.Core
         /// 觸控點在捲動區移動事件
         /// </summary>
         public event EventHandler<ScrollZoneEventArgs>? ScrollZoneMove;
+
+        /// <summary>
+        /// 角落觸擊事件
+        /// </summary>
+        public event EventHandler<CornerTapEventArgs>? CornerTap;
 
         /// <summary>
         /// 目前觸控點數量
@@ -65,8 +71,21 @@ namespace TouchpadAdvancedTool.Core
             _lastTouchpadEventTime = DateTime.Now;
             _touchpadInfo = args.TouchpadInfo;
 
+            // 初始化手勢辨識器（如果尚未初始化且啟用角落觸擊）
+            if (_gestureRecognizer == null && _touchpadInfo != null && _touchpadInfo.IsInitialized)
+            {
+                _gestureRecognizer = new GestureRecognizer(_touchpadInfo, settings);
+                _gestureRecognizer.CornerTap += OnGestureRecognizerCornerTap;
+            }
+
+            // 更新手勢辨識器設定
+            _gestureRecognizer?.UpdateSettings(settings);
+
             // 更新觸控點狀態
             UpdateContacts(args.Contacts);
+
+            // 處理手勢偵測
+            _gestureRecognizer?.ProcessInput(args.Contacts);
 
             // 檢查觸控點數量是否符合設定
             if (_activeContacts.Count < settings.MinimumContactsForScroll ||
@@ -342,6 +361,15 @@ namespace TouchpadAdvancedTool.Core
         }
 
         /// <summary>
+        /// 處理手勢辨識器的角落觸擊事件
+        /// </summary>
+        private void OnGestureRecognizerCornerTap(object? sender, CornerTapEventArgs e)
+        {
+            // 轉發角落觸擊事件
+            CornerTap?.Invoke(this, e);
+        }
+
+        /// <summary>
         /// 重置追蹤器狀態
         /// </summary>
         public void Reset()
@@ -349,6 +377,7 @@ namespace TouchpadAdvancedTool.Core
             _activeContacts.Clear();
             _primaryContact = null;
             IsInScrollZone = false;
+            _gestureRecognizer?.Reset();
         }
     }
 

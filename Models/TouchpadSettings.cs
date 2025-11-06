@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Collections.Generic;
 
 namespace TouchpadAdvancedTool.Models
 {
@@ -26,6 +27,16 @@ namespace TouchpadAdvancedTool.Models
 
         private int _minimumContactsForScroll = 1;
         private int _maximumContactsForScroll = 1;
+
+        // 角落觸擊設定
+        private bool _enableCornerTap = false;
+        private double _cornerTapSize = 10.0;
+        private int _cornerTapMaxDuration = 300;
+        private double _cornerTapMovementThreshold = 5.0;
+        private CornerAction _topLeftAction = CornerAction.None;
+        private CornerAction _topRightAction = CornerAction.None;
+        private CornerAction _bottomLeftAction = CornerAction.None;
+        private CornerAction _bottomRightAction = CornerAction.RightClick;
 
         /// <summary>
         /// 是否啟用側邊捲動
@@ -199,6 +210,93 @@ namespace TouchpadAdvancedTool.Models
                 if (value > 5) value = 5;
                 SetProperty(ref _maximumContactsForScroll, value);
             }
+        }
+
+        /// <summary>
+        /// 啟用角落觸擊功能
+        /// </summary>
+        public bool EnableCornerTap
+        {
+            get => _enableCornerTap;
+            set => SetProperty(ref _enableCornerTap, value);
+        }
+
+        /// <summary>
+        /// 角落區域大小（百分比：5-20）
+        /// </summary>
+        public double CornerTapSize
+        {
+            get => _cornerTapSize;
+            set
+            {
+                if (value < 5.0) value = 5.0;
+                if (value > 20.0) value = 20.0;
+                SetProperty(ref _cornerTapSize, value);
+            }
+        }
+
+        /// <summary>
+        /// 角落觸擊最大時長（毫秒：100-1000）
+        /// </summary>
+        public int CornerTapMaxDuration
+        {
+            get => _cornerTapMaxDuration;
+            set
+            {
+                if (value < 100) value = 100;
+                if (value > 1000) value = 1000;
+                SetProperty(ref _cornerTapMaxDuration, value);
+            }
+        }
+
+        /// <summary>
+        /// 角落觸擊移動閾值（百分比：1-10）
+        /// </summary>
+        public double CornerTapMovementThreshold
+        {
+            get => _cornerTapMovementThreshold;
+            set
+            {
+                if (value < 1.0) value = 1.0;
+                if (value > 10.0) value = 10.0;
+                SetProperty(ref _cornerTapMovementThreshold, value);
+            }
+        }
+
+        /// <summary>
+        /// 左上角動作
+        /// </summary>
+        public CornerAction TopLeftAction
+        {
+            get => _topLeftAction;
+            set => SetProperty(ref _topLeftAction, value);
+        }
+
+        /// <summary>
+        /// 右上角動作
+        /// </summary>
+        public CornerAction TopRightAction
+        {
+            get => _topRightAction;
+            set => SetProperty(ref _topRightAction, value);
+        }
+
+        /// <summary>
+        /// 左下角動作
+        /// </summary>
+        public CornerAction BottomLeftAction
+        {
+            get => _bottomLeftAction;
+            set => SetProperty(ref _bottomLeftAction, value);
+        }
+
+        /// <summary>
+        /// 右下角動作
+        /// </summary>
+        public CornerAction BottomRightAction
+        {
+            get => _bottomRightAction;
+            set => SetProperty(ref _bottomRightAction, value);
         }
 
         #region INotifyPropertyChanged
@@ -388,5 +486,66 @@ namespace TouchpadAdvancedTool.Models
         /// Y 軸移動距離
         /// </summary>
         public int DeltaY => Y - LastY;
+    }
+
+    /// <summary>
+    /// 角落觸擊動作
+    /// </summary>
+    public enum CornerAction
+    {
+        /// <summary>
+        /// 無動作
+        /// </summary>
+        None,
+
+        /// <summary>
+        /// 顯示桌面
+        /// </summary>
+        ShowDesktop,
+
+        /// <summary>
+        /// 工作檢視（虛擬桌面）
+        /// </summary>
+        TaskView,
+
+        /// <summary>
+        /// 動作中心
+        /// </summary>
+        ActionCenter,
+
+        /// <summary>
+        /// 媒體播放/暫停
+        /// </summary>
+        MediaPlayPause,
+
+        /// <summary>
+        /// 媒體下一首
+        /// </summary>
+        MediaNextTrack,
+
+        /// <summary>
+        /// 媒體上一首
+        /// </summary>
+        MediaPreviousTrack,
+
+        /// <summary>
+        /// 音量靜音
+        /// </summary>
+        VolumeMute,
+
+        /// <summary>
+        /// 螢幕擷取（Win + Shift + S）
+        /// </summary>
+        ScreenSnip,
+
+        /// <summary>
+        /// 滑鼠右鍵
+        /// </summary>
+        RightClick,
+
+        /// <summary>
+        /// 執行自訂指令
+        /// </summary>
+        CustomCommand
     }
 }

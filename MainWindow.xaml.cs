@@ -497,5 +497,59 @@ namespace TouchpadAdvancedTool
         }
     }
 
+    /// <summary>
+    /// Enum 值列表轉換器（用於 ComboBox）
+    /// </summary>
+    public class EnumValuesConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is Type enumType && enumType.IsEnum)
+            {
+                return Enum.GetValues(enumType);
+            }
+            return Array.Empty<object>();
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// CornerAction 顯示文字轉換器
+    /// </summary>
+    public class CornerActionDisplayConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is CornerAction action)
+            {
+                return action switch
+                {
+                    CornerAction.None => "無動作",
+                    CornerAction.ShowDesktop => "顯示桌面",
+                    CornerAction.TaskView => "工作檢視",
+                    CornerAction.ActionCenter => "動作中心",
+                    CornerAction.MediaPlayPause => "播放/暫停",
+                    CornerAction.MediaNextTrack => "下一首",
+                    CornerAction.MediaPreviousTrack => "上一首",
+                    CornerAction.VolumeMute => "靜音",
+                    CornerAction.ScreenSnip => "螢幕擷取",
+                    CornerAction.RightClick => "滑鼠右鍵",
+                    CornerAction.CustomCommand => "自訂指令",
+                    _ => action.ToString()
+                };
+            }
+            return value?.ToString() ?? string.Empty;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     #endregion
 }

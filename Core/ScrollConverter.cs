@@ -125,14 +125,17 @@ namespace TouchpadAdvancedTool.Core
                     var input = new INPUT
                     {
                         Type = INPUT_MOUSE,
-                        Mouse = new MOUSEINPUT
+                        U = new InputUnion
                         {
-                            X = 0,
-                            Y = 0,
-                            MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
-                            Flags = MOUSEEVENTF_WHEEL,
-                            Time = 0,
-                            ExtraInfo = IntPtr.Zero
+                            mi = new MOUSEINPUT
+                            {
+                                X = 0,
+                                Y = 0,
+                                MouseData = (uint)(scrollUnitsY * WHEEL_DELTA),
+                                Flags = MOUSEEVENTF_WHEEL,
+                                Time = 0,
+                                ExtraInfo = IntPtr.Zero
+                            }
                         }
                     };
 
@@ -155,14 +158,17 @@ namespace TouchpadAdvancedTool.Core
                     var input = new INPUT
                     {
                         Type = INPUT_MOUSE,
-                        Mouse = new MOUSEINPUT
+                        U = new InputUnion
                         {
-                            X = 0,
-                            Y = 0,
-                            MouseData = (uint)(scrollUnitsX * WHEEL_DELTA),
-                            Flags = MOUSEEVENTF_HWHEEL,
-                            Time = 0,
-                            ExtraInfo = IntPtr.Zero
+                            mi = new MOUSEINPUT
+                            {
+                                X = 0,
+                                Y = 0,
+                                MouseData = (uint)(scrollUnitsX * WHEEL_DELTA),
+                                Flags = MOUSEEVENTF_HWHEEL,
+                                Time = 0,
+                                ExtraInfo = IntPtr.Zero
+                            }
                         }
                     };
 
