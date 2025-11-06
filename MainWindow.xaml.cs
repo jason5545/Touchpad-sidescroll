@@ -61,6 +61,7 @@ namespace TouchpadAdvancedTool
 
                 touchpadTracker.EnterScrollZone += OnEnterScrollZone;
                 touchpadTracker.ExitScrollZone += OnExitScrollZone;
+                touchpadTracker.ScrollZoneMove += OnScrollZoneMove;
                 rawInputManager.TouchpadInput += OnTouchpadInputForVisualization;
                 rawInputManager.TouchpadDetected += OnTouchpadDetectedForVisualization;
 
@@ -339,8 +340,8 @@ namespace TouchpadAdvancedTool
 
             Dispatcher.Invoke(() =>
             {
-                ScrollStateText.Text = "捲動中";
-                ScrollStateText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // 綠色
+                ScrollStateText.Text = "準備中";
+                ScrollStateText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // 橘色
 
                 // 高亮捲動區
                 var fadeIn = new DoubleAnimation
@@ -349,6 +350,25 @@ namespace TouchpadAdvancedTool
                     Duration = TimeSpan.FromSeconds(0.2)
                 };
                 ScrollZoneRect.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            });
+        }
+
+        /// <summary>
+        /// 捲動區移動事件處理（真正開始捲動時）
+        /// </summary>
+        private void OnScrollZoneMove(object? sender, ScrollZoneEventArgs e)
+        {
+            if (!_viewModel?.Settings.ShowTouchVisualization ?? true)
+                return;
+
+            Dispatcher.Invoke(() =>
+            {
+                // 只有在真正捲動時才顯示"捲動中"
+                if (ScrollStateText.Text != "捲動中")
+                {
+                    ScrollStateText.Text = "捲動中";
+                    ScrollStateText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // 綠色
+                }
             });
         }
 
