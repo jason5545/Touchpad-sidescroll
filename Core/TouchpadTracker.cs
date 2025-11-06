@@ -140,7 +140,7 @@ namespace TouchpadAdvancedTool.Core
                 _primaryContact = highConfidenceContact;
             }
             // 否則，檢查低信心觸控點是否在捲動區內
-            else if (anyTouchingContact != null && IsContactInScrollZone(anyTouchingContact, settings))
+            else if (anyTouchingContact != null && GetScrollZoneType(anyTouchingContact, settings) != ScrollZoneType.None)
             {
                 _primaryContact = anyTouchingContact;
                 if (settings.DebugMode)
