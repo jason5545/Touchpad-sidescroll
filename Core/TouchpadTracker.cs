@@ -268,9 +268,9 @@ namespace TouchpadAdvancedTool.Core
                     CurrentScrollZoneType = currentScrollZoneType;
                     EnterScrollZone?.Invoke(this, scrollArgs);
                 }
-                else
+                else if (_currentGestureState == GestureState.Scrolling)
                 {
-                    // 在捲動區內移動
+                    // 在捲動區內移動（只有在 Scrolling 狀態時才觸發）
                     ScrollZoneMove?.Invoke(this, scrollArgs);
                 }
             }

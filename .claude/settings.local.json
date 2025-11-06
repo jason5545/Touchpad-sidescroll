@@ -20,7 +20,10 @@
       "Bash(./TouchpadAdvancedTool.exe:*)",
       "Bash(find:*)",
       "Bash(tasklist /FI \"IMAGENAME eq TouchpadAdvancedTool.exe\")",
-      "Bash(cmd.exe /c \"tasklist | findstr TouchpadAdvancedTool\")"
+      "Bash(cmd.exe /c \"tasklist | findstr TouchpadAdvancedTool\")",
+      "Bash(git push:*)",
+      "Bash(dotnet clean:*)",
+      "Bash(dotnet publish:*)"
     ],
     "deny": [],
     "ask": []
