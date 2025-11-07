@@ -433,22 +433,64 @@ namespace TouchpadAdvancedTool.Core
                 GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfo.RIDI_DEVICENAME, IntPtr.Zero, ref size);
 
                 if (size == 0)
-                    return "Unknown Touchpad";
+                    return "Precision Touchpad";
 
-                IntPtr namePtr = Marshal.AllocHGlobal((int)size * 2); // Unicode
+                // size 已經是字符數（包含 null 結尾），不需要再乘以 2
+                IntPtr namePtr = Marshal.AllocHGlobal((int)size * 2);
                 try
                 {
-                    GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfo.RIDI_DEVICENAME, namePtr, ref size);
-                    return Marshal.PtrToStringUni(namePtr) ?? "Unknown Touchpad";
+                    uint result = GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfo.RIDI_DEVICENAME, namePtr, ref size);
+                    if (result == unchecked((uint)-1))
+                        return "Precision Touchpad";
+
+                    // 讀取完整的設備路徑
+                    string? devicePath = Marshal.PtrToStringUni(namePtr);
+
+                    if (string.IsNullOrEmpty(devicePath))
+                        return "Precision Touchpad";
+
+                    // 設備路徑格式通常是 \\?\HID#VID_xxxx&PID_yyyy#...
+                    // 提取廠商和產品信息來創建更友好的名稱
+                    string friendlyName = ExtractFriendlyName(devicePath);
+                    return friendlyName;
                 }
                 finally
                 {
                     Marshal.FreeHGlobal(namePtr);
                 }
             }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "取得裝置名稱失敗");
+                return "Precision Touchpad";
+            }
+        }
+
+        /// <summary>
+        /// 從設備路徑提取友好名稱
+        /// </summary>
+        private string ExtractFriendlyName(string devicePath)
+        {
+            try
+            {
+                // 設備路徑格式: \\?\HID#VID_04F3&PID_311C&Col01#...
+                // 提取 VID 和 PID
+                int vidIndex = devicePath.IndexOf("VID_", StringComparison.OrdinalIgnoreCase);
+                int pidIndex = devicePath.IndexOf("PID_", StringComparison.OrdinalIgnoreCase);
+
+                if (vidIndex >= 0 && pidIndex >= 0)
+                {
+                    string vid = devicePath.Substring(vidIndex + 4, 4);
+                    string pid = devicePath.Substring(pidIndex + 4, 4);
+                    return $"Precision Touchpad (VID:{vid} PID:{pid})";
+                }
+
+                // 如果無法提取 VID/PID，返回簡單名稱
+                return "Precision Touchpad";
+            }
             catch
             {
-                return "Unknown Touchpad";
+                return "Precision Touchpad";
             }
         }
 

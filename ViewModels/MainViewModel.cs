@@ -223,13 +223,39 @@ namespace TouchpadAdvancedTool.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                TouchpadInfoText = $"{touchpadInfo.DeviceName}\n" +
+                // 根據 VID 識別廠商
+                string vendorName = GetVendorName(touchpadInfo.VendorId);
+                string deviceName = $"{vendorName} Precision Touchpad";
+
+                TouchpadInfoText = $"{deviceName}\n" +
                                    $"範圍：{touchpadInfo.LogicalMinX}~{touchpadInfo.LogicalMaxX} × " +
                                    $"{touchpadInfo.LogicalMinY}~{touchpadInfo.LogicalMaxY}\n" +
                                    $"大小：{touchpadInfo.Width} × {touchpadInfo.Height}";
 
                 UpdateStatus();
             });
+        }
+
+        /// <summary>
+        /// 根據 VID 取得廠商名稱
+        /// </summary>
+        private string GetVendorName(uint vid)
+        {
+            return vid switch
+            {
+                0x04F3 => "ELAN",           // 義隆電子
+                0x06CB => "Synaptics",      // 新思科技
+                0x044E => "Alps",           // Alps Electric
+                0x2386 => "Raydium",        // 瑞鼎科技
+                0x093A => "Pixart",         // 原相科技
+                0x1FD2 => "Melfas",         // Melfas
+                0x0483 => "STMicro",        // 意法半導體
+                0x045E => "Microsoft",      // 微軟
+                0x0911 => "Goodix",         // 匯頂科技
+                0x27C6 => "Goodix",         // 匯頂科技 (另一個 VID)
+                0x048D => "ITE Tech",       // 聯陽半導體
+                _ => $"VID:{vid:X4}"        // 未知廠商，顯示 VID
+            };
         }
 
         /// <summary>
