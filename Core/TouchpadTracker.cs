@@ -206,7 +206,7 @@ namespace TouchpadAdvancedTool.Core
                             Contact = _primaryContact,
                             DeltaX = _primaryContact.DeltaX,
                             DeltaY = _primaryContact.DeltaY,
-                            TouchpadInfo = _touchpadInfo,
+                            TouchpadInfo = _touchpadInfo!,
                             ZoneType = scrollZoneType
                         });
                     }
@@ -273,7 +273,7 @@ namespace TouchpadAdvancedTool.Core
                     Contact = _primaryContact,
                     DeltaX = _primaryContact.DeltaX,
                     DeltaY = _primaryContact.DeltaY,
-                    TouchpadInfo = _touchpadInfo,
+                    TouchpadInfo = _touchpadInfo!,
                     ZoneType = currentScrollZoneType
                 };
 
