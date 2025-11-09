@@ -65,6 +65,16 @@ namespace TouchpadAdvancedTool.Core
         public ScrollZoneType CurrentScrollZoneType { get; private set; } = ScrollZoneType.None;
 
         /// <summary>
+        /// 是否應該攔截滑鼠移動事件
+        /// </summary>
+        /// <remarks>
+        /// 在捲動或角落觸擊狀態下，即使暫時離開捲動區，也應該攔截滑鼠移動
+        /// </remarks>
+        public bool ShouldInterceptMouseMovement =>
+            _currentGestureState == GestureState.Scrolling ||
+            _currentGestureState == GestureState.CornerTap;
+
+        /// <summary>
         /// 主要觸控點（用於游標移動）
         /// </summary>
         public ContactInfo? PrimaryContact => _primaryContact;
