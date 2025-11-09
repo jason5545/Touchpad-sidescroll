@@ -317,11 +317,12 @@ namespace TouchpadAdvancedTool.ViewModels
             if (!Settings.IsEnabled)
                 return;
 
-            // 快速路徑：如果不在捲動區內，直接返回，不需要進行耗時的來源判斷
-            if (!_touchpadTracker.IsInScrollZone)
+            // 快速路徑：如果不需要攔截滑鼠移動，直接返回
+            // 這會檢查當前的手勢狀態（捲動或角落觸擊），即使暫時離開捲動區也會攔截
+            if (!_touchpadTracker.ShouldInterceptMouseMovement)
                 return;
 
-            // 只有在捲動區內時，才檢查滑鼠事件是否來自觸控板
+            // 檢查滑鼠事件是否來自觸控板
             if (_touchpadTracker.IsMouseEventFromTouchpad(Settings))
             {
                 args.ShouldIntercept = true;
