@@ -14,8 +14,8 @@ namespace TouchpadAdvancedTool.Services
     public class SettingsManager
     {
         private readonly ILogger<SettingsManager> _logger;
+        private readonly StartupManager _startupManager;
         private readonly string _settingsPath;
-        private const string RegistryKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string AppName = "TouchpadAdvancedTool";
 
         private TouchpadSettings _settings;
@@ -30,9 +30,10 @@ namespace TouchpadAdvancedTool.Services
         /// </summary>
         public event EventHandler<TouchpadSettings>? SettingsChanged;
 
-        public SettingsManager(ILogger<SettingsManager> logger)
+        public SettingsManager(ILogger<SettingsManager> logger, StartupManager startupManager)
         {
             _logger = logger;
+            _startupManager = startupManager;
 
             // 設定檔路徑：%LocalAppData%\TouchpadAdvancedTool\settings.json
             var appDataPath = Path.Combine(
@@ -44,6 +45,9 @@ namespace TouchpadAdvancedTool.Services
 
             // 載入或建立預設設定
             _settings = LoadSettings();
+
+            // 同步開機啟動狀態：檢查 Registry 實際狀態並更新設定
+            SyncStartupState();
 
             // 訂閱設定變更事件
             _settings.PropertyChanged += (s, e) =>
@@ -144,48 +148,62 @@ namespace TouchpadAdvancedTool.Services
         }
 
         /// <summary>
-        /// 更新開機自動啟動註冊表項目
+        /// 同步開機啟動狀態
         /// </summary>
-        private void UpdateStartupRegistry(bool enable)
+        private void SyncStartupState()
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, true);
+                bool registryEnabled = _startupManager.IsStartupEnabled();
 
-                if (key == null)
+                // 如果 Registry 狀態與設定不一致，以 Registry 為準
+                if (registryEnabled != _settings.StartWithWindows)
                 {
-                    _logger.LogError("無法開啟註冊表鍵：{Path}", RegistryKeyPath);
-                    return;
+                    _logger.LogInformation("同步開機啟動狀態：Registry={RegistryState}, Settings={SettingsState}, 以 Registry 為準",
+                        registryEnabled, _settings.StartWithWindows);
+
+                    // 暫時取消訂閱以避免觸發 UpdateStartupRegistry
+                    _settings.StartWithWindows = registryEnabled;
+                    SaveSettings();
                 }
 
-                if (enable)
+                // 驗證啟動項目是否有效
+                if (registryEnabled && !_startupManager.ValidateStartupEntry())
                 {
-                    // 取得應用程式執行檔路徑
-                    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-
-                    if (string.IsNullOrEmpty(exePath))
-                    {
-                        _logger.LogError("無法取得執行檔路徑");
-                        return;
-                    }
-
-                    // 加入開機啟動項目
-                    key.SetValue(AppName, $"\"{exePath}\"", RegistryValueKind.String);
-                    _logger.LogInformation("已加入開機啟動項目");
-                }
-                else
-                {
-                    // 移除開機啟動項目
-                    if (key.GetValue(AppName) != null)
-                    {
-                        key.DeleteValue(AppName);
-                        _logger.LogInformation("已移除開機啟動項目");
-                    }
+                    _logger.LogWarning("開機啟動項目無效，正在更新...");
+                    _startupManager.EnableStartup(silentStart: true);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "更新開機啟動設定失敗");
+                _logger.LogError(ex, "同步開機啟動狀態失敗");
+            }
+        }
+
+        /// <summary>
+        /// 更新開機自動啟動註冊表項目
+        /// </summary>
+        private void UpdateStartupRegistry(bool enable)
+        {
+            bool success;
+
+            if (enable)
+            {
+                success = _startupManager.EnableStartup(silentStart: true);
+            }
+            else
+            {
+                success = _startupManager.DisableStartup();
+            }
+
+            if (!success)
+            {
+                _logger.LogWarning("更新開機啟動設定失敗");
+                System.Windows.MessageBox.Show(
+                    "無法更新開機啟動設定，可能需要管理員權限。",
+                    "權限不足",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Warning);
             }
         }
 
@@ -194,16 +212,7 @@ namespace TouchpadAdvancedTool.Services
         /// </summary>
         public bool IsStartupEnabled()
         {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
-                return key?.GetValue(AppName) != null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "檢查開機啟動設定失敗");
-                return false;
-            }
+            return _startupManager.IsStartupEnabled();
         }
 
         /// <summary>

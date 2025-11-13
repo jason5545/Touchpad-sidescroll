@@ -1,10 +1,10 @@
 # Touchpad Advanced Tool
 
-一個使用 Windows Precision Touchpad API 實作的觸控板進階工具，提供側邊捲動等多種觸控板增強功能，讓您可以在觸控板的邊緣區域垂直滑動來捲動頁面，就像 MacOS 的側邊捲動功能一樣。
+一個使用 Windows Precision Touchpad API 實作的觸控板進階工具，提供邊緣捲動等多種觸控板增強功能，讓您可以在觸控板的邊緣區域垂直滑動來捲動頁面，就像 MacOS 的邊緣捲動功能一樣。
 
 ## 功能特色
 
-- ✨ **側邊捲動**：在觸控板右側（或左側）區域垂直滑動即可捲動頁面
+- ✨ **邊緣捲動**：在觸控板右側（或左側）區域垂直滑動即可捲動頁面
 - 🎯 **Precision Touchpad 支援**：使用 Windows Precision Touchpad API 取得原始觸控資料
 - ⚙️ **可自訂設定**：調整捲動區寬度、位置、速度和靈敏度
 - 🎨 **現代化 UI**：使用 ModernWpf 打造的美觀介面

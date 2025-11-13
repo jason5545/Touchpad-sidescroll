@@ -48,7 +48,7 @@
                 <ContextMenu>
                     <MenuItem Header="開啟" Click="ShowWindow_Click" FontWeight="Bold"/>
                     <Separator/>
-                    <MenuItem Header="啟用側邊捲動" IsCheckable="True"
+                    <MenuItem Header="啟用增強功能" IsCheckable="True"
                               IsChecked="{Binding Settings.IsEnabled, Mode=TwoWay}"/>
                     <Separator/>
                     <MenuItem Header="結束" Click="Exit_Click"/>
@@ -254,7 +254,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="側邊捲動功能"
+                            <TextBlock Text="觸控板增強功能"
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="White"/>

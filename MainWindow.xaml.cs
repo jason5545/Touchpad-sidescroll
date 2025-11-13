@@ -121,7 +121,7 @@ namespace TouchpadAdvancedTool
                     // 最小化到系統匣
                     Hide();
                     _notifyIcon?.ShowBalloonTip(
-                        "Touchpad 側邊捲動",
+                        "Touchpad Advanced Tool",
                         "應用程式已最小化到系統匣",
                         Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
                 }

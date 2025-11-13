@@ -17,6 +17,7 @@ namespace TouchpadAdvancedTool
     {
         private static Mutex? _mutex;
         private IServiceProvider? _serviceProvider;
+        private bool _startMinimized;
 
         /// <summary>
         /// 應用程式啟動
@@ -25,17 +26,25 @@ namespace TouchpadAdvancedTool
         {
             try
             {
+                // 檢查命令列參數
+                _startMinimized = e.Args.Length > 0 &&
+                    (e.Args[0] == "--minimized" || e.Args[0] == "--silent" || e.Args[0] == "-m");
+
                 // 檢查是否已有執行個體在執行（單一執行個體）
                 const string mutexName = "TouchpadAdvancedTool_SingleInstance_Mutex";
                 _mutex = new Mutex(true, mutexName, out bool createdNew);
 
                 if (!createdNew)
                 {
-                    MessageBox.Show(
-                        "Touchpad Advanced Tool 已在執行中。",
-                        "Touchpad Advanced Tool",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    // 如果是靜默啟動，不顯示訊息直接退出
+                    if (!_startMinimized)
+                    {
+                        MessageBox.Show(
+                            "Touchpad Advanced Tool 已在執行中。",
+                            "Touchpad Advanced Tool",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
                     Shutdown();
                     return;
                 }
@@ -77,9 +86,23 @@ namespace TouchpadAdvancedTool
                 Log.Information("正在建立主視窗");
                 // 顯示主視窗
                 var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
-                Log.Information("正在顯示主視窗");
-                mainWindow.Show();
-                Log.Information("主視窗已顯示");
+
+                if (_startMinimized)
+                {
+                    // 靜默啟動：啟動到系統匣，不顯示主視窗
+                    Log.Information("靜默啟動模式：啟動到系統匣");
+                    // 必須先 Show() 再設定 WindowState，否則會出現問題
+                    mainWindow.Show();
+                    mainWindow.WindowState = WindowState.Minimized;
+                    mainWindow.Hide();
+                    Log.Information("應用程式已靜默啟動到系統匣");
+                }
+                else
+                {
+                    Log.Information("正在顯示主視窗");
+                    mainWindow.Show();
+                    Log.Information("主視窗已顯示");
+                }
             }
             catch (Exception ex)
             {
@@ -115,6 +138,7 @@ namespace TouchpadAdvancedTool
             services.AddSingleton<MouseHookManager>();
             services.AddSingleton<TouchpadTracker>();
             services.AddSingleton<ScrollConverter>();
+            services.AddSingleton<StartupManager>();
             services.AddSingleton<SettingsManager>();
 
             // ViewModels

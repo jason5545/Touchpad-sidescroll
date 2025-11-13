@@ -39,7 +39,7 @@ namespace TouchpadAdvancedTool.Models
         private CornerAction _bottomRightAction = CornerAction.RightClick;
 
         /// <summary>
-        /// 是否啟用側邊捲動
+        /// 是否啟用增強功能
         /// </summary>
         public bool IsEnabled
         {
