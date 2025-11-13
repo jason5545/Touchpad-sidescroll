@@ -131,18 +131,39 @@ namespace TouchpadAdvancedTool.Services
         {
             _logger.LogInformation("重置為預設設定");
 
+            // 基本設定
             _settings.IsEnabled = true;
             _settings.ScrollZoneWidth = 15.0;
             _settings.ScrollZonePosition = ScrollZonePosition.Right;
             _settings.ScrollSensitivity = 1.0;
             _settings.ScrollSpeed = 2.0;
             _settings.InvertScrollDirection = false;
+
+            // 水平捲動設定
             _settings.EnableHorizontalScroll = false;
+            _settings.InvertHorizontalScroll = false;
+            _settings.HorizontalScrollZoneHeight = 15.0;
+            _settings.HorizontalScrollZonePosition = HorizontalScrollZonePosition.Top;
+
+            // 觸控點數設定
             _settings.MinimumContactsForScroll = 1;
             _settings.MaximumContactsForScroll = 1;
+
+            // 系統設定
             _settings.StartWithWindows = false;
             _settings.MinimizeToTray = true;
             _settings.DebugMode = false;
+            _settings.ShowTouchVisualization = true;
+
+            // 角落觸擊設定
+            _settings.EnableCornerTap = false;
+            _settings.CornerTapSize = 10.0;
+            _settings.CornerTapMaxDuration = 300;
+            _settings.CornerTapMovementThreshold = 5.0;
+            _settings.TopLeftAction = CornerAction.None;
+            _settings.TopRightAction = CornerAction.None;
+            _settings.BottomLeftAction = CornerAction.None;
+            _settings.BottomRightAction = CornerAction.RightClick;
 
             SaveSettings();
         }
@@ -270,18 +291,39 @@ namespace TouchpadAdvancedTool.Services
                 }
 
                 // 複製所有屬性
+                // 基本設定
                 _settings.IsEnabled = settings.IsEnabled;
                 _settings.ScrollZoneWidth = settings.ScrollZoneWidth;
                 _settings.ScrollZonePosition = settings.ScrollZonePosition;
                 _settings.ScrollSensitivity = settings.ScrollSensitivity;
                 _settings.ScrollSpeed = settings.ScrollSpeed;
                 _settings.InvertScrollDirection = settings.InvertScrollDirection;
+
+                // 水平捲動設定
                 _settings.EnableHorizontalScroll = settings.EnableHorizontalScroll;
+                _settings.InvertHorizontalScroll = settings.InvertHorizontalScroll;
+                _settings.HorizontalScrollZoneHeight = settings.HorizontalScrollZoneHeight;
+                _settings.HorizontalScrollZonePosition = settings.HorizontalScrollZonePosition;
+
+                // 觸控點數設定
                 _settings.MinimumContactsForScroll = settings.MinimumContactsForScroll;
                 _settings.MaximumContactsForScroll = settings.MaximumContactsForScroll;
+
+                // 系統設定
                 _settings.StartWithWindows = settings.StartWithWindows;
                 _settings.MinimizeToTray = settings.MinimizeToTray;
                 _settings.DebugMode = settings.DebugMode;
+                _settings.ShowTouchVisualization = settings.ShowTouchVisualization;
+
+                // 角落觸擊設定
+                _settings.EnableCornerTap = settings.EnableCornerTap;
+                _settings.CornerTapSize = settings.CornerTapSize;
+                _settings.CornerTapMaxDuration = settings.CornerTapMaxDuration;
+                _settings.CornerTapMovementThreshold = settings.CornerTapMovementThreshold;
+                _settings.TopLeftAction = settings.TopLeftAction;
+                _settings.TopRightAction = settings.TopRightAction;
+                _settings.BottomLeftAction = settings.BottomLeftAction;
+                _settings.BottomRightAction = settings.BottomRightAction;
 
                 SaveSettings();
 

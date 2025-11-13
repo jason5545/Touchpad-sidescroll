@@ -28,6 +28,7 @@ namespace TouchpadAdvancedTool
         private readonly List<Point> _trailPoints = new();
         private const int MaxTrailPoints = 30;
         private Storyboard? _pulseAnimation;
+        private bool _isExiting = false;
 
         public MainWindow()
         {
@@ -139,6 +140,13 @@ namespace TouchpadAdvancedTool
         /// </summary>
         private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
+            // 如果是透過「結束」選單項目關閉，則允許關閉
+            if (_isExiting)
+            {
+                return;
+            }
+
+            // 如果啟用「最小化到系統匣」，則取消關閉並最小化
             if (_viewModel?.Settings.MinimizeToTray == true)
             {
                 // 取消關閉，改為最小化到系統匣
@@ -178,11 +186,8 @@ namespace TouchpadAdvancedTool
         /// </summary>
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
-            // 強制關閉
-            if (_viewModel != null)
-            {
-                _viewModel.Settings.MinimizeToTray = false;
-            }
+            // 設定旗標以允許應用程式關閉
+            _isExiting = true;
             Application.Current.Shutdown();
         }
 
