@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,9 @@ namespace TouchpadAdvancedTool
                 // 檢查命令列參數
                 _startMinimized = e.Args.Length > 0 &&
                     (e.Args[0] == "--minimized" || e.Args[0] == "--silent" || e.Args[0] == "-m");
+
+                // 確保工作目錄正確（當從註冊表啟動時，工作目錄可能是 System32）
+                Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
                 // 檢查是否已有執行個體在執行（單一執行個體）
                 const string mutexName = "TouchpadAdvancedTool_SingleInstance_Mutex";

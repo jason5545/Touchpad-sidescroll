@@ -163,12 +163,17 @@ namespace TouchpadAdvancedTool.Services
         /// 取得執行檔路徑
         /// </summary>
         /// <returns>執行檔路徑</returns>
+        /// <summary>
+        /// 取得執行檔路徑
+        /// </summary>
+        /// <returns>執行檔路徑</returns>
         private string? GetExecutablePath()
         {
             try
             {
-                // 取得當前執行檔路徑
-                return System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                // 使用 Environment.ProcessPath 取得當前執行檔路徑 (.NET 6+)
+                // 這比 Process.GetCurrentProcess().MainModule.FileName 更可靠且效能更好
+                return Environment.ProcessPath;
             }
             catch (Exception ex)
             {
