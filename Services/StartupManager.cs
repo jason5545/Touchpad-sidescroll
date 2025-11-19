@@ -1,8 +1,8 @@
 using System;
 using System.IO;
-using System.Reflection;
+using System.Security.Principal;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
+using Microsoft.Win32.TaskScheduler;
 
 namespace TouchpadAdvancedTool.Services
 {
@@ -12,8 +12,7 @@ namespace TouchpadAdvancedTool.Services
     public class StartupManager
     {
         private readonly ILogger<StartupManager> _logger;
-        private const string RegistryKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        private const string AppName = "TouchpadAdvancedTool";
+        private const string TaskName = "TouchpadAdvancedTool";
 
         public StartupManager(ILogger<StartupManager> logger)
         {
@@ -21,7 +20,7 @@ namespace TouchpadAdvancedTool.Services
         }
 
         /// <summary>
-        /// 啟用開機自動啟動
+        /// 啟用開機自動啟動（使用排程工作，於使用者登入時以最高權限執行）
         /// </summary>
         /// <param name="silentStart">是否靜默啟動（啟動到系統匣）</param>
         /// <returns>是否成功</returns>
@@ -36,99 +35,142 @@ namespace TouchpadAdvancedTool.Services
                     return false;
                 }
 
-                // 建構啟動命令
-                var command = silentStart ? $"\"{exePath}\" --minimized" : $"\"{exePath}\"";
+                using var taskService = new TaskService();
+                using var taskDefinition = taskService.NewTask();
 
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, true);
-                if (key == null)
+                taskDefinition.RegistrationInfo.Description = "Touchpad Advanced Tool - 開機自動啟動";
+
+                var currentUser = WindowsIdentity.GetCurrent().Name;
+
+                // 以目前使用者最高權限執行
+                taskDefinition.Principal.UserId = currentUser;
+                taskDefinition.Principal.LogonType = TaskLogonType.InteractiveToken;
+                taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;
+
+                // 觸發條件：目前使用者登入時
+                taskDefinition.Triggers.Add(new LogonTrigger
                 {
-                    _logger.LogError("無法開啟註冊表鍵：{Path}", RegistryKeyPath);
-                    return false;
-                }
+                    UserId = currentUser
+                });
 
-                key.SetValue(AppName, command, RegistryValueKind.String);
-                _logger.LogInformation("已啟用開機自動啟動：{Command}", command);
+                var arguments = silentStart ? "--minimized" : string.Empty;
+                var workingDirectory = Path.GetDirectoryName(exePath);
+
+                taskDefinition.Actions.Add(new ExecAction(exePath, arguments, workingDirectory));
+
+                // 建立或更新排程工作
+                taskService.RootFolder.RegisterTaskDefinition(
+                    TaskName,
+                    taskDefinition,
+                    TaskCreation.CreateOrUpdate,
+                    null,
+                    null,
+                    TaskLogonType.InteractiveToken,
+                    null);
+
+                _logger.LogInformation(
+                    "已啟用開機自動啟動（排程工作）：TaskName={TaskName}, Path={Path}, Args={Args}",
+                    TaskName, exePath, arguments);
+
                 return true;
             }
             catch (UnauthorizedAccessException ex)
             {
-                _logger.LogError(ex, "啟用開機自動啟動失敗：權限不足");
+                _logger.LogError(ex, "啟用開機自動啟動失敗：權限不足（建立排程工作失敗）");
                 return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "啟用開機自動啟動失敗");
+                _logger.LogError(ex, "啟用開機自動啟動失敗（建立排程工作失敗）");
                 return false;
             }
         }
 
         /// <summary>
-        /// 停用開機自動啟動
+        /// 停用開機自動啟動（刪除排程工作）
         /// </summary>
         /// <returns>是否成功</returns>
         public bool DisableStartup()
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, true);
-                if (key == null)
+                using var taskService = new TaskService();
+                var existingTask = taskService.GetTask(TaskName);
+
+                if (existingTask == null)
                 {
-                    _logger.LogError("無法開啟註冊表鍵：{Path}", RegistryKeyPath);
-                    return false;
+                    _logger.LogInformation(
+                        "停用開機自動啟動：找不到排程工作，視為已停用。TaskName={TaskName}",
+                        TaskName);
+                    return true;
                 }
 
-                if (key.GetValue(AppName) != null)
-                {
-                    key.DeleteValue(AppName);
-                    _logger.LogInformation("已停用開機自動啟動");
-                }
+                taskService.RootFolder.DeleteTask(TaskName, false);
+                _logger.LogInformation("已停用開機自動啟動（已刪除排程工作）：TaskName={TaskName}", TaskName);
                 return true;
             }
             catch (UnauthorizedAccessException ex)
             {
-                _logger.LogError(ex, "停用開機自動啟動失敗：權限不足");
+                _logger.LogError(ex, "停用開機自動啟動失敗：權限不足（刪除排程工作失敗）");
                 return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "停用開機自動啟動失敗");
+                _logger.LogError(ex, "停用開機自動啟動失敗（刪除排程工作失敗）");
                 return false;
             }
         }
 
         /// <summary>
-        /// 檢查是否已啟用開機自動啟動
+        /// 檢查是否已啟用開機自動啟動（是否存在排程工作）
         /// </summary>
         /// <returns>是否已啟用</returns>
         public bool IsStartupEnabled()
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
-                var value = key?.GetValue(AppName) as string;
-                return !string.IsNullOrEmpty(value);
+                using var taskService = new TaskService();
+                var task = taskService.GetTask(TaskName);
+                return task != null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "檢查開機自動啟動狀態失敗");
+                _logger.LogError(ex, "檢查開機自動啟動狀態失敗（排程工作）");
                 return false;
             }
         }
 
         /// <summary>
-        /// 取得當前註冊的啟動命令
+        /// 取得當前註冊的啟動命令（從排程工作動作）
         /// </summary>
         /// <returns>啟動命令，如果未啟用則返回 null</returns>
         public string? GetStartupCommand()
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
-                return key?.GetValue(AppName) as string;
+                using var taskService = new TaskService();
+                var task = taskService.GetTask(TaskName);
+                if (task == null)
+                    return null;
+
+                if (task.Definition.Actions.Count == 0)
+                    return null;
+
+                if (task.Definition.Actions[0] is not ExecAction execAction)
+                    return null;
+
+                if (string.IsNullOrEmpty(execAction.Path))
+                    return null;
+
+                var arguments = string.IsNullOrWhiteSpace(execAction.Arguments)
+                    ? string.Empty
+                    : " " + execAction.Arguments;
+
+                return $"\"{execAction.Path}\"" + arguments;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "取得啟動命令失敗");
+                _logger.LogError(ex, "取得啟動命令失敗（排程工作）");
                 return null;
             }
         }
@@ -154,7 +196,7 @@ namespace TouchpadAdvancedTool.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "驗證啟動項目失敗");
+                _logger.LogError(ex, "驗證啟動項目失敗（排程工作）");
                 return false;
             }
         }
