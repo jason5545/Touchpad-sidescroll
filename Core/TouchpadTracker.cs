@@ -23,11 +23,22 @@ namespace TouchpadAdvancedTool.Core
         {
             None,           // 無手勢
             CornerTap,      // 角落觸擊進行中
+            ScrollPending,  // 等待確認是否捲動（遲滯機制）
             Scrolling,      // 捲動進行中
             NormalCursor    // 已離開區域，恢復為一般游標
         }
         private GestureState _currentGestureState = GestureState.None;
         private uint _gestureContactId = 0; // 觸發手勢的觸點 ID
+
+        // 捲動區遲滯機制
+        private int _scrollZoneEntryFrameCount = 0;  // 連續在捲動區內的幀數
+        private int _pendingDeltaX = 0;  // 在 ScrollPending 狀態累積的 X 移動量
+        private int _pendingDeltaY = 0;  // 在 ScrollPending 狀態累積的 Y 移動量
+        private ScrollZoneType _pendingScrollZoneType = ScrollZoneType.None;  // 待確認的捲動區類型
+
+        // 遲滯閾值設定
+        private const int RequiredFramesForScrollEntry = 2;  // 進入捲動需要連續幀數
+        private const int DirectionThresholdPixels = 15;     // 方向判定的最小移動量
 
         /// <summary>
         /// 觸控點進入捲動區事件
@@ -116,6 +127,7 @@ namespace TouchpadAdvancedTool.Core
                     _logger.LogDebug($"所有觸點離開，重置手勢狀態：{_currentGestureState}");
                     _currentGestureState = GestureState.None;
                     _gestureContactId = 0;
+                    ResetScrollPendingState();
                 }
 
                 if (IsInScrollZone)
@@ -133,12 +145,14 @@ namespace TouchpadAdvancedTool.Core
             {
                 // 如果觸控點數量不符（例如多指或無指），且正在手勢中，必須重置狀態
                 // 否則 aggressive blocking 會導致游標卡住
-                if (_currentGestureState == GestureState.Scrolling || 
-                    _currentGestureState == GestureState.CornerTap)
+                if (_currentGestureState == GestureState.Scrolling ||
+                    _currentGestureState == GestureState.CornerTap ||
+                    _currentGestureState == GestureState.ScrollPending)
                 {
                     _logger.LogDebug($"觸控點數量不符 ({_activeContacts.Count})，重置手勢狀態：{_currentGestureState} -> NormalCursor");
                     _currentGestureState = GestureState.NormalCursor;
                     _gestureContactId = 0;
+                    ResetScrollPendingState();
                 }
 
                 // 觸控板數量不符，退出捲動模式
@@ -191,14 +205,16 @@ namespace TouchpadAdvancedTool.Core
 
             if (_primaryContact == null)
             {
-                // 如果主要觸控點遺失（例如變為低信心），但仍在捲動或角落觸擊狀態
+                // 如果主要觸控點遺失（例如變為低信心），但仍在手勢狀態
                 // 強制轉換為一般游標狀態，以免游標被鎖住
-                if (_currentGestureState == GestureState.Scrolling || 
-                    _currentGestureState == GestureState.CornerTap)
+                if (_currentGestureState == GestureState.Scrolling ||
+                    _currentGestureState == GestureState.CornerTap ||
+                    _currentGestureState == GestureState.ScrollPending)
                 {
                     _logger.LogDebug($"主要觸控點遺失，重置手勢狀態：{_currentGestureState} -> NormalCursor");
                     _currentGestureState = GestureState.NormalCursor;
                     _gestureContactId = 0;
+                    ResetScrollPendingState();
                 }
 
                 if (IsInScrollZone)
@@ -280,6 +296,7 @@ namespace TouchpadAdvancedTool.Core
             if (_currentGestureState == GestureState.NormalCursor)
             {
                 ClearScrollZoneState();
+                ResetScrollPendingState();
                 return;
             }
 
@@ -288,7 +305,6 @@ namespace TouchpadAdvancedTool.Core
 
             if (inScrollZone)
             {
-
                 // 檢查是否在角落區域（如果啟用角落觸擊，則排除角落區域）
                 if (settings.EnableCornerTap && IsInCornerZone(_primaryContact, settings))
                 {
@@ -299,14 +315,95 @@ namespace TouchpadAdvancedTool.Core
                     }
                 }
 
-                // 進入或保持在捲動狀態
+                // 處理進入捲動區的遲滯機制
                 if (_currentGestureState == GestureState.None)
                 {
-                    _currentGestureState = GestureState.Scrolling;
+                    // 首次進入捲動區，開始 ScrollPending 狀態
+                    _currentGestureState = GestureState.ScrollPending;
                     _gestureContactId = _primaryContact.Id;
-                    _logger.LogDebug($"進入捲動狀態，觸點 ID: {_primaryContact.Id}");
+                    _scrollZoneEntryFrameCount = 1;
+                    _pendingDeltaX = _primaryContact.DeltaX;
+                    _pendingDeltaY = _primaryContact.DeltaY;
+                    _pendingScrollZoneType = currentScrollZoneType;
+                    _logger.LogDebug($"進入 ScrollPending 狀態，觸點 ID: {_primaryContact.Id}, 類型: {currentScrollZoneType}");
+                    return; // 第一幀不攔截，讓游標正常移動
                 }
 
+                if (_currentGestureState == GestureState.ScrollPending)
+                {
+                    // 在 ScrollPending 狀態，累積移動量並檢查是否應該進入 Scrolling
+                    _scrollZoneEntryFrameCount++;
+                    _pendingDeltaX += _primaryContact.DeltaX;
+                    _pendingDeltaY += _primaryContact.DeltaY;
+
+                    // 檢查是否滿足進入捲動的條件
+                    bool shouldEnterScrolling = false;
+
+                    if (_scrollZoneEntryFrameCount >= RequiredFramesForScrollEntry)
+                    {
+                        // 已達到幀數閾值，檢查移動方向
+                        int absDeltaX = Math.Abs(_pendingDeltaX);
+                        int absDeltaY = Math.Abs(_pendingDeltaY);
+
+                        if (currentScrollZoneType == ScrollZoneType.Vertical)
+                        {
+                            // 垂直捲動區：Y 移動量應該大於 X 移動量（表示縱向滑動意圖）
+                            // 或者移動量很小（可能是靜止準備捲動）
+                            bool isVerticalMovement = absDeltaY >= absDeltaX;
+                            bool isSmallMovement = absDeltaX < DirectionThresholdPixels && absDeltaY < DirectionThresholdPixels;
+                            shouldEnterScrolling = isVerticalMovement || isSmallMovement;
+
+                            if (!shouldEnterScrolling)
+                            {
+                                // 橫向穿越，轉為一般游標模式
+                                _currentGestureState = GestureState.NormalCursor;
+                                ResetScrollPendingState();
+                                _logger.LogDebug($"橫向穿越垂直捲動區，轉為一般游標模式 (DeltaX={_pendingDeltaX}, DeltaY={_pendingDeltaY})");
+                                return;
+                            }
+                        }
+                        else if (currentScrollZoneType == ScrollZoneType.Horizontal)
+                        {
+                            // 水平捲動區：X 移動量應該大於 Y 移動量
+                            bool isHorizontalMovement = absDeltaX >= absDeltaY;
+                            bool isSmallMovement = absDeltaX < DirectionThresholdPixels && absDeltaY < DirectionThresholdPixels;
+                            shouldEnterScrolling = isHorizontalMovement || isSmallMovement;
+
+                            if (!shouldEnterScrolling)
+                            {
+                                // 縱向穿越，轉為一般游標模式
+                                _currentGestureState = GestureState.NormalCursor;
+                                ResetScrollPendingState();
+                                _logger.LogDebug($"縱向穿越水平捲動區，轉為一般游標模式 (DeltaX={_pendingDeltaX}, DeltaY={_pendingDeltaY})");
+                                return;
+                            }
+                        }
+                    }
+
+                    if (shouldEnterScrolling)
+                    {
+                        // 確認進入捲動狀態
+                        _currentGestureState = GestureState.Scrolling;
+                        _logger.LogDebug($"確認進入捲動狀態，觸點 ID: {_primaryContact.Id}, 累積幀數: {_scrollZoneEntryFrameCount}");
+
+                        // 進入捲動區
+                        IsInScrollZone = true;
+                        CurrentScrollZoneType = currentScrollZoneType;
+                        EnterScrollZone?.Invoke(this, new ScrollZoneEventArgs
+                        {
+                            Contact = _primaryContact,
+                            DeltaX = _pendingDeltaX,  // 使用累積的移動量
+                            DeltaY = _pendingDeltaY,
+                            TouchpadInfo = _touchpadInfo!,
+                            ZoneType = currentScrollZoneType
+                        });
+
+                        ResetScrollPendingState();
+                    }
+                    return; // ScrollPending 狀態不攔截游標
+                }
+
+                // 已經在 Scrolling 狀態
                 var scrollArgs = new ScrollZoneEventArgs
                 {
                     Contact = _primaryContact,
@@ -331,7 +428,17 @@ namespace TouchpadAdvancedTool.Core
             }
             else
             {
-                // 離開捲動區，使用統一的清除方法
+                // 離開捲動區
+                // 如果在 ScrollPending 狀態離開，直接轉為 NormalCursor（確認是穿越而非捲動）
+                if (_currentGestureState == GestureState.ScrollPending)
+                {
+                    _currentGestureState = GestureState.NormalCursor;
+                    ResetScrollPendingState();
+                    _logger.LogDebug($"ScrollPending 狀態離開捲動區，轉為一般游標模式");
+                    return;
+                }
+
+                // 使用統一的清除方法
                 ClearScrollZoneState();
 
                 // 在非捲動區時，轉換為一般游標狀態
@@ -343,6 +450,17 @@ namespace TouchpadAdvancedTool.Core
                     _logger.LogDebug($"在非捲動區，設置為一般游標模式");
                 }
             }
+        }
+
+        /// <summary>
+        /// 重置 ScrollPending 狀態相關的欄位
+        /// </summary>
+        private void ResetScrollPendingState()
+        {
+            _scrollZoneEntryFrameCount = 0;
+            _pendingDeltaX = 0;
+            _pendingDeltaY = 0;
+            _pendingScrollZoneType = ScrollZoneType.None;
         }
 
         /// <summary>
@@ -666,6 +784,7 @@ namespace TouchpadAdvancedTool.Core
             IsInScrollZone = false;
             _currentGestureState = GestureState.None;
             _gestureContactId = 0;
+            ResetScrollPendingState();
             _gestureRecognizer?.Reset();
         }
     }
